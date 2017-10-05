@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package>
+  <name>ras_project_odometry</name>
+  <version>0.0.0</version>
+  <description>The ras_project_odometry package</description>
+
+  <maintainer email="ras11@todo.todo">ras11</maintainer>
+
+  <license>TODO</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>phidgets</build_depend>
+
+  <run_depend>roscpp</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>phidgets</run_depend>
+
+  <export>
+
+  </export>
+</package>

@@ -1,0 +1,15 @@
+<!--//param to change
+    //double int_err1 = 0.0;
+    //double alpha1 = 12;
+   // double beta1 = 30;
+
+    //double int_err2 = 0.0;
+    //double alpha2 = 10;
+    //double beta2 = 30;
+    //const
+    //double wheel_radius_ = 0.035;
+    //double base_ = 0.25;
+
+    //double * point_int_err1, * point_int_err2;
+    //point_int_err1 = &int_err1;
+    //point_int_err2 = &int_err2;-->
