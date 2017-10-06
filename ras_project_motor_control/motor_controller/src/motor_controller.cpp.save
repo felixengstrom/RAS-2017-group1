@@ -90,19 +90,19 @@ int main (int argc, char **argv)
     ros::Rate loop_rate(10);
 
     double dt = 0.1;
-    const double control_frequency = 100;
+    const double control_frequency = 10;
     const double ticks_per_rev = 3591.84;
     const double base_ = 0.238;
     const double wheel_radius_ = 0.036;
 
     //Controller parameters
     double int_err_left = 0.0;
-    double alpha_left = 10.0;
-    double beta_left = 5.0;
+    double alpha_left = 100.0;
+    double beta_left = 50.0;
 
     double int_err_right = 0.0;
-    double alpha_right = 10.0;
-    double beta_right = 5.0;
+    double alpha_right = 100.0;
+    double beta_right = 50.0;
 
     while(ros::ok())
     {
@@ -124,8 +124,8 @@ int main (int argc, char **argv)
             ROS_INFO("est left : %f", est_wl);
             ROS_INFO("est right : %f", est_wr);
 
-            float v = 6*wheel_radius_*(est_wl + est_wr)/2;
-            float omega = 6*wheel_radius_*(est_wr-est_wl)/base_;
+            float v = wheel_radius_*(est_wl + est_wr)/2;
+            float omega = wheel_radius_*(est_wr-est_wl)/base_;
 
             //ROS_INFO("current omega:%f, current v:%f", omega, v); 
 

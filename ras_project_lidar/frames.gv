@@ -1,0 +1,8 @@
+digraph G {
+"world" -> "robot"[label="Broadcaster: /odometry\nAverage rate: 10.204 Hz\nMost recent transform: 1507212953.509 ( 0.091 sec old)\nBuffer length: 4.900 sec\n"];
+"robot" -> "lidar"[label="Broadcaster: /lidar_broadcaster\nAverage rate: 10.204 Hz\nMost recent transform: 1507212953.577 ( 0.022 sec old)\nBuffer length: 4.900 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1507212953.600"[ shape=plaintext ] ;
+ }->"world";
+}

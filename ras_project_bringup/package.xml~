@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>ras_project_lidar</name>
+  <name>ras_project_bringup</name>
   <version>0.0.0</version>
-  <description>The ras_project_lidar package</description>
+  <description>The ras_project_bringup package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/ras_project_lidar</url> -->
+  <!-- <url type="website">http://wiki.ros.org/ras_project_bringup</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->
@@ -40,16 +40,9 @@
   <!-- Use test_depend for packages you need only for testing: -->
   <!--   <test_depend>gtest</test_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
-  <buildtool_depend>roscpp</buildtool_depend>
-  <buildtool_depend>sensor_msgs</buildtool_depend>
-  <buildtool_depend>tf</buildtool_depend>
-  <buildtool_depend>std_msgs</buildtool_depend>
 
-  <run_depend>roscpp</run_depend>
+
   <!-- The export tag contains other, unspecified, tags -->
-  <run_depend>tf</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>sensor_msgs</run_depend>
   <export>
     <!-- Other tools can request additional information be placed here -->
 

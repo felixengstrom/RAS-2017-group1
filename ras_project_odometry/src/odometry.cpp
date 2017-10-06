@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <math.h>
 #include <tf/transform_broadcaster.h>
+#include <geometry_msgs/Twist.h>
 #include "phidgets/motor_encoder.h"
 
 const static float PI = acos(-1);
@@ -9,59 +10,41 @@ class OdometryNode
     private:
         ros::NodeHandle n_;
         ros::Publisher odom_pub; 
+        ros::Subscriber sub;
         tf::Transform transform;
         tf::TransformBroadcaster br;
         tf::Quaternion q;
+        double current_x, current_y, current_omega;
 
     public:
         OdometryNode() 
         {
-            delta_t = 0.008;
+            current_x = current_y = current_omega = 0;
             n_ = ros::NodeHandle();
+            sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
         }
-        void PublishVelocity();
-        {
-
-            float control_freq = 1/delta_t;
-            float est_wl = last_change_left*2*PI*control_freq/ticks_per_rev;
-            float est_wr = last_change_right*2*PI*control_freq/ticks_per_rev;
-
-            float v = wheel_radius*(est_wl + est_wr)/2;
-            float omega = wheel_radius*(est_wr-est_wl)/2;
-
-            transform.setOrigin( tf::Vector3(delta_t*v, 0.0, 0.0) );
-            q.setRPY(0, 0, omega*delta_t);
-            transform.setRotation(q);
-            br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "robot"));
-        }
+        void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
 };
-void OdometryNode::PublishVelocity();
-{
 
-    transform.setOrigin( tf::Vector3(delta_t*v, 0.0, 0.0) );
-    q.setRPY(0, 0, omega*delta_t);
+
+void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
+{
+    double dt = 0.1;
+    double v = msg->linear.x; 
+    double omega = msg->angular.z; 
+    current_x = current_x + cos(current_omega)*v*dt;
+    current_y = current_y + sin(current_omega)*v*dt;
+    current_omega = current_omega + omega*dt;
+    ROS_INFO("x:%f y:%f, omega:%f", current_x, current_y, current_omega);
+    transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
+    q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "robot"));
 }
+
 int main(int argc, char ** argv){
     ros::init(argc, argv, "odometry");
     OdometryNode on  = OdometryNode();
-    ros::Rate loop_rate(100);
-    while(ros::ok())
-    {
-        on.PublishVelocity();
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
+    ros::spin();
+    return 0;
 }
-
-//#include <messege_filters/subscriber.h>
-//#include <messege_filters/syncronizer.h>
-//#include <message_filters/sync_policies/approximate_time.h>
-        //message_filters::Subscriber<phidgets::motor_encoder> left_encoder;
-       //message_filters::Subscriber<phidgets::motor_encoder> right_encoder;
-       // typedef sync_policies::ApproximateTime<phidgets::motor_encoder, phidgets::motor_encoder> MySyncPolicy;
-       // // ApproximateTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
-       // Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), left_encoder, right_encoder);
-
-       // sync.registerCallback(boost::bind(&EncoderCallback, _1, _2));

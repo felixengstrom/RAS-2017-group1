@@ -28,8 +28,8 @@ private:
 TeleopTurtle::TeleopTurtle():
   linear_(0),
   angular_(0),
-  l_scale_(1.0),
-  a_scale_(3.0)
+  l_scale_(0.05),
+  a_scale_(0.5)
 {
   nh_.param("scale_angular", a_scale_, a_scale_);
   nh_.param("scale_linear", l_scale_, l_scale_);
@@ -53,7 +53,7 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "teleop_turtle");
   TeleopTurtle teleop_turtle;
-  ros::Rate loop_rate(100);
+  ros::Rate loop_rate(10);
 
   signal(SIGINT,quit);
   teleop_turtle.keyLoop();
