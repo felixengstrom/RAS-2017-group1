@@ -14,11 +14,13 @@ class OdometryNode
         tf::Transform transform;
         tf::TransformBroadcaster br;
         tf::Quaternion q;
+        ros::Time time;
         double current_x, current_y, current_omega;
 
     public:
         OdometryNode() 
         {
+            time = ros::Time::now();
             current_x = current_y = current_omega = 0;
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
@@ -29,9 +31,11 @@ class OdometryNode
 
 void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
 {
-    double dt = 0.1;
-    double v = msg->linear.x; 
-    double omega = msg->angular.z; 
+    ros::Time current_time = ros::Time::now();
+    double dt = (current_time - time).toSec();
+    time = current_time;
+    double v = 6*msg->linear.x; 
+    double omega =6* msg->angular.z; 
     current_x = current_x + cos(current_omega)*v*dt;
     current_y = current_y + sin(current_omega)*v*dt;
     current_omega = current_omega + omega*dt;

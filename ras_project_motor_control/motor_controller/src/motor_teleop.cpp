@@ -53,7 +53,7 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "teleop_turtle");
   TeleopTurtle teleop_turtle;
-  ros::Rate loop_rate(10);
+  ros::Rate loop_rate(100);
 
   signal(SIGINT,quit);
   teleop_turtle.keyLoop();

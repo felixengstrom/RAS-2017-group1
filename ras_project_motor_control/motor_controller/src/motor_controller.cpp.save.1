@@ -18,14 +18,9 @@ class EncoderListener
         ros::Subscriber left_encoder_sub;
         ros::Subscriber right_encoder_sub;
 
-
     public:
         int last_change_right;
         int last_change_left;
-        ros::Time last_reading_left;
-        ros::Time last_reading_right;
-        double duration_left;
-        double duration_right;
         EncoderListener( ros::NodeHandle& n_);
         void LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
         void RightEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
@@ -43,24 +38,31 @@ EncoderListener::EncoderListener( ros::NodeHandle& n_ )
                                             this);
     last_change_right = 0;
     last_change_left = 0;
-    last_reading_left;
-    last_reading_right;
 }
 
 void EncoderListener::LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg)
 {
     last_change_left = msg->count_change;
-    duration_left = (last_reading_left - msg->header.stamp).toSec();
-    last_reading_left = msg->header.stamp;
-    ROS_INFO("encoder sum %i", msg->count );
 }
 
 void EncoderListener::RightEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg)
 {
     last_change_right = msg->count_change;
-    duration_right = (last_reading_right - msg->header.stamp).toSec();
-    last_reading_right = msg->header.stamp;
 }
+
+
+/*void twistCallback (const geometry_msgs::Twist::ConstPtr& msg)
+{
+    lin_vel_ = msg->linear.x;
+    ang_vel_ = msg->angular.z;
+    //ROS_INFO("I heard:", msg->linear);
+}
+
+void encoderCallback (const phidgets::motor_encoder::ConstPtr& msg)
+{
+    delta_encoder = msg->count_change;
+    //ROS_INFO("I:", msg->delta_encoder2);
+}*/
 
 void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
 {
@@ -88,53 +90,47 @@ int main (int argc, char **argv)
     ros::Rate loop_rate(10);
 
     double dt = 0.1;
-    const double control_frequency = 10;
-    const double ticks_per_rev = 800; //3591.84;
+    const double control_frequency = 100;
+    const double ticks_per_rev = 3591.84;
     const double base_ = 0.238;
     const double wheel_radius_ = 0.036;
 
     //Controller parameters
     double int_err_left = 0.0;
-    double alpha_left = 7.5/5;//12
-    double beta_left = 30.0/5;//20
+    double alpha_left = 10.0;
+    double beta_left = 5.0;
 
     double int_err_right = 0.0;
-    double alpha_right = 7.5/5;//12
-    double beta_right = 30.0/5;//20
+    double alpha_right = 10.0;
+    double beta_right = 5.0;
 
     while(ros::ok())
     {
 
         // Desired wheels angular velocities
-		
             float desired_wl = (lin_vel_ - base_*ang_vel_/2)/wheel_radius_;
             float desired_wr = (lin_vel_ + base_*ang_vel_/2)/wheel_radius_;
             ROS_INFO("desired left : %f", desired_wl);
             ROS_INFO("desired right : %f", desired_wr);
             // Code for calculating estimated current velocity based on encoders
-
-	        int n=5, i, sum_left=0, sum_right=0;
             int last_change_left = (listener.last_change_left);
             int last_change_right = -(listener.last_change_right);
-
-            ROS_INFO("encoder duration left : %f", listener.duration_left);
-            ROS_INFO("escoder duration right : %f", listener.duration_right);            
 
             ROS_INFO("encoder change left : %i", last_change_left);
             ROS_INFO("escoder change right : %i", last_change_right);
 
             float est_wl = last_change_left*2*PI*control_frequency/ticks_per_rev;
             float est_wr = last_change_right*2*PI*control_frequency/ticks_per_rev;
-
             ROS_INFO("est left : %f", est_wl);
             ROS_INFO("est right : %f", est_wr);
 
-            float v = wheel_radius_*(est_wl + est_wr)/2;
-            float omega = wheel_radius_*(est_wr-est_wl)/base_;
+            float v = 6*wheel_radius_*(est_wl + est_wr)/2;
+            float omega = 6*wheel_radius_*(est_wr-est_wl)/base_;
 
-            //ROS_INFO("current omega:%f, current v:%f", omega, v);
+            //ROS_INFO("current omega:%f, current v:%f", omega, v); 
 
             //Controller
+        	//double  delta_encoder_double = double (delta_encoder);
         
             float error_left = desired_wl - est_wl;
             float error_right = desired_wr - est_wr;
@@ -144,20 +140,15 @@ int main (int argc, char **argv)
 
             int_err_left += error_left*dt;
             int_err_right += error_right*dt;
+            
 
-	//set max PWM values 100
-            float pwm_left_float = std:: max(-100.0, (std::min(100.0,(1*desired_wl + alpha_left * error_left + beta_left * int_err_left))));
-            float pwm_right_float =  std::max(-100.0, (std::min(100.0, (1*desired_wr + alpha_right * error_right + beta_right * int_err_right))));
-            if (abs(pwm_left_float)>=100.0)
-	{
-		int_err_left -=error_left*dt;
-	}
-	   if  (abs(pwm_right_float)>=100.0)
-	{
-		int_err_right -=error_right*dt;
-	}
-            ROS_INFO("integral error left: %f", int_err_left);
-	    ROS_INFO("integral error right: %f", int_err_right);
+            float pwm_left_float =  alpha_left * error_left + beta_left * int_err_left;
+            float pwm_right_float =  alpha_right * error_right + beta_right * int_err_right;
+            //int pwm = (int)(pwm_double);
+            //float pwmL = (float) desired_wL * 2;
+            //float pwmR = (float) desired_wR * 2;
+            ROS_INFO("pwm L: %f", pwm_left_float);
+            ROS_INFO("pwm R: %f", pwm_right_float);
 
             ROS_INFO("estimated v:%f, estimated omega:%f", v, omega);
             ROS_INFO("wanted v:%f, wanted omega:%f", lin_vel_, ang_vel_);
@@ -168,18 +159,14 @@ int main (int argc, char **argv)
             
 	    if (lin_vel_ == 0 && ang_vel_ ==0)
 	{
-	    pwm_left_float = 0;
-		msg1.data = pwm_left_float;
-	    pwm_right_float = 0;
-		msg2.data = pwm_right_float;
+		msg1.data = 0;
+		msg2.data = 0;
 	}
             else 
 	{
 		msg1.data = pwm_left_float;
            	msg2.data = pwm_right_float;
 	}
-ROS_INFO ("PWM left: %f", pwm_left_float);
-ROS_INFO ("PWM right:%f", pwm_right_float);
             vel_left_pub.publish(msg1);
             vel_right_pub.publish(msg2);
 
