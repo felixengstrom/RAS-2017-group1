@@ -1,8 +1,0 @@
-<launch>
-    <node name="uArm_control" pkg="ras_project_uArm" type="uArm_control_node" output="screen">
-        <param name="j0_start" type="int" value="29" />
-        <param name="j1_start" type="int" value="116" />
-        <param name="j2_start" type="int" value="-3" />
-        <param name="j3_start" type="int" value="-46" />
-    </node>
-</launch>

@@ -1,0 +1,8 @@
+<launch>
+    <node name="uarm_control" pkg="ras_project_uarm" type="uarm_control_node" output="screen">
+        <param name="j0_start" type="double" value="93" />
+        <param name="j1_start" type="double" value="87.7" />
+        <param name="j2_start" type="double" value="-31" />
+        <param name="j3_start" type="double" value="93" />
+    </node>
+</launch>

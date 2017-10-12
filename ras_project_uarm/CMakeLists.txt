@@ -1,21 +1,22 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(ras_project_uArm)
+project(ras_project_uarm)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
-)
-
-catkin_package(
+  geometry_msgs
 )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(uArm_control_node src/uArm_control.cpp)
+catkin_package(
+)
 
-target_link_libraries(uArm_control_node
+add_executable(uarm_control_node src/uarm_control.cpp)
+
+target_link_libraries(uarm_control_node
   ${catkin_LIBRARIES}
 )
 

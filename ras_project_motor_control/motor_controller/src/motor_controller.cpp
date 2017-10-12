@@ -88,19 +88,19 @@ int main (int argc, char **argv)
     ros::Rate loop_rate(10);
 
     double dt = 0.1;
-    const double control_frequency = 10;
-    const double ticks_per_rev = 800; //3591.84;
+    const double control_frequency =100; //10; //still of by about 4
+    const double ticks_per_rev = 3591.84;//900; //3591.84;
     const double base_ = 0.238;
     const double wheel_radius_ = 0.036;
 
     //Controller parameters
     double int_err_left = 0.0;
-    double alpha_left = 7.5/5;//12
-    double beta_left = 30.0/5;//20
+    double alpha_left = 7.5;//7.5/5;//12
+    double beta_left = 30.5;//30.0/5;//20
 
     double int_err_right = 0.0;
-    double alpha_right = 7.5/5;//12
-    double beta_right = 30.0/5;//20
+    double alpha_right = 7.5;///5;//12
+    double beta_right = 30.0;///5;//20
 
     while(ros::ok())
     {

@@ -2,6 +2,7 @@
 #include <math.h>
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Pose2D.h>
 #include "phidgets/motor_encoder.h"
 
 const static float PI = acos(-1);
@@ -24,6 +25,7 @@ class OdometryNode
             current_x = current_y = current_omega = 0;
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
+	    odom_pub = n_.advertise<geometry_msgs::Pose2D>("robot/pose", 1000);
         }
         void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
 };
@@ -39,7 +41,15 @@ void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
     current_x = current_x + cos(current_omega)*v*dt;
     current_y = current_y + sin(current_omega)*v*dt;
     current_omega = current_omega + omega*dt;
+    if (current_omega > PI) {
+	current_omega = fmod(current_omega,PI)-PI;
+    }
     ROS_INFO("x:%f y:%f, omega:%f", current_x, current_y, current_omega);
+    geometry_msgs::Pose2D pose;
+    pose.x = current_x;
+    pose.y = current_y;
+    pose.theta = current_omega;
+    odom_pub.publish(pose);
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
