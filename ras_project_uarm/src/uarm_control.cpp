@@ -1,9 +1,14 @@
 #include <ros/ros.h>
 #include <math.h>
 #include <geometry_msgs/Point.h>
+#include <std_msgs/Int32.h>
 #include "uarm/MoveToJoints.h"
+#include "uarm/Pump.h"
+//#include "ras_project_uarm/MoveArmCartesian.h"
 
 static const double PI = acos(-1);
+static const double ROBOT_RADIUS = 0.22;
+static const double ROBOT_HEIGHT = 0.05;
 
 struct AngleSetting{
     double j0;
@@ -25,12 +30,16 @@ class UarmController{
         double d0, d1, d2, d3, d4, d5;
         ros::NodeHandle n;
         ros::Subscriber sub;
-        ros::ServiceClient client;
+        ros::Subscriber sub2;
+        ros::ServiceClient client; ros::ServiceClient client2;
     
     public:
-        void moveArm(double x, double y, double z);
+        bool moveArm(double x, double y, double z);
         UarmController(ros::NodeHandle& nh);
         void moveToPointCallback(const geometry_msgs::Point::ConstPtr& msg);
+ //       void moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
+//                                ras_project_uarm::MoveArmCartesian::Response &res);
+        void engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg);
         AngleSetting invKinematic(double x,double y,double z);
 };
 
@@ -50,12 +59,12 @@ UarmController::UarmController(ros::NodeHandle& nh)
     n_.getParam("j3_start", j3_start);
 
     
-    d0 = 9;
-    d1 = 2.5;
-    d2 = 14.85;
-    d3 = 16;
-    d4 = 3.5;
-    d5 = 6;
+    d0 = 0.09;
+    d1 = 0.02;
+    d2 = 0.15;
+    d3 = 0.16;
+    d4 = 0.033;
+    d5 = 0.06;
 
     n_.getParam("d0", d0);
     n_.getParam("d1", d1);
@@ -64,18 +73,38 @@ UarmController::UarmController(ros::NodeHandle& nh)
     n_.getParam("d4", d4);
     n_.getParam("d5", d5);
 
-    client = n.serviceClient<uarm::MoveToJoints>("/uarm/move_to_joints");
+  //  ros::ServiceServer service = n.advertiseService("/uarm/moveToPose", moveToPointService);
 
-    sub = n.subscribe("uarm/moveToPoint",1, &UarmController::moveToPointCallback, this);
+    client = n.serviceClient<uarm::MoveToJoints>("/uarm/move_to_joints");
+    client2 = n.serviceClient<uarm::Pump>("/uarm/pump");
+
+    sub = n.subscribe("uarm/moveToPose",1, &UarmController::moveToPointCallback, this);
+    sub2 = n.subscribe("uarm/engageSuction",1, &UarmController::engageSuctionCallback, this);
 }
 
 void UarmController::moveToPointCallback(const geometry_msgs::Point::ConstPtr& msg)
 {
-
-    this->moveArm(msg->x,msg->y,msg->z);
-    ROS_INFO("point to move to x:%f, y:%f, z:%f", msg->x, msg->y, msg->z);
+    if (pow(msg->x,2) + pow(msg->y,2) < pow(ROBOT_RADIUS, 2) && msg->z<ROBOT_HEIGHT)
+    {
+        ROS_INFO("Move not allowed, to close to robot");
+    } else
+    {
+        this->moveArm(msg->x,msg->y,msg->z);
+    }
 }
-
+//bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
+//                        ras_project_uarm::MoveArmCartesian::Response &res)
+//{
+    
+//    if (pow(req->x,2) + pow(req->y,2) < pow(ROBOT_RADIUS, 2) && req->z<ROBOT_HEIGHT)
+//    {
+//        ROS_INFO("Move not allowed, to close to robot");
+//        return is_success;
+//    } else
+//    {
+//        return this->moveArm(msg->x,msg->y,msg->z);
+//    }
+//}
 AngleSetting UarmController::invKinematic(double x,double y,double z)
 {   
     //Calculate first angle
@@ -86,7 +115,7 @@ AngleSetting UarmController::invKinematic(double x,double y,double z)
 
     //Calculate base rotation angle
     double non_relative_j0 = atan(y/x);
-    angs.j0 =  -radiansToDegrees(non_relative_j0) + this->j0_start;
+    angs.j0 =  radiansToDegrees(non_relative_j0) + this->j0_start;
 
     //Calculate distance between j1 and joint on end effectoror
     double h_hight = z - d0 + d5;
@@ -108,7 +137,21 @@ AngleSetting UarmController::invKinematic(double x,double y,double z)
     return angs;
 }
 
-void UarmController::moveArm(double x, double y, double z)
+void UarmController::engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg)
+{
+    if (msg->data == 1)
+    {
+        uarm::Pump srv;
+        srv.request.pump_status = 1;
+        client2.call(srv);
+    } else if (msg->data == 0) {
+        uarm::Pump srv;
+        srv.request.pump_status = 0;
+        client2.call(srv);
+    }
+
+}
+bool UarmController::moveArm(double x, double y, double z)
 {
     AngleSetting angs = invKinematic(x, y, z);
     uarm::MoveToJoints srv;
@@ -117,8 +160,10 @@ void UarmController::moveArm(double x, double y, double z)
     srv.request.j2 = angs.j2;
     srv.request.j3 = j3_start;
     srv.request.interpolation_type = 2;
-    srv.request.movement_duration = ros::Duration(3,0);
-    client.call(srv);
+    srv.request.movement_duration = ros::Duration(2,0);
+    bool success = client.call(srv);
+    ROS_INFO("call made to uarm service");
+    return success;
 }
 
 int main(int argc, char* argv[])
@@ -128,7 +173,27 @@ int main(int argc, char* argv[])
   
   UarmController uc = UarmController(n);
   ros::Rate loop_rate(1);
-  uc.moveArm(25,0,0);
+  ros::NodeHandle nh("~");
+  
+  bool waitForArm = false;
+
+  nh.getParam("waitForArm", waitForArm);
+
+  double x_start = 0.15;
+  double y_start = 0.0;
+  double z_start = 0.15;
+
+  nh.getParam("x_start", x_start);
+  nh.getParam("y_start", y_start);
+  nh.getParam("z_start", z_start);
+
+  bool uarm_started = ros::service::waitForService("/uarm/move_to_joints", 5000);
+  if (uarm_started){
+    uc.moveArm(x_start,y_start,z_start);
+    ROS_INFO("move arm tried");
+  } else { 
+      ROS_INFO("no uarm service running");
+  }
 
   while(ros::ok()){
       ros::spinOnce();

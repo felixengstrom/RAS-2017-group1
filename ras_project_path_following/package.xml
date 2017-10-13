@@ -45,13 +45,16 @@
   <buildtool_depend>tf</buildtool_depend>
   <buildtool_depend>std_msgs</buildtool_depend>
   <buildtool_depend>geometry_msgs</buildtool_depend>
-
+  <buildtool_depend>laser_geometry</buildtool_depend>
+  <buildtool_depend>message_filters</buildtool_depend>
   <run_depend>roscpp</run_depend>
   <!-- The export tag contains other, unspecified, tags -->
   <run_depend>tf</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>geometry_msgs</run_depend>
+  <run_depend>laser_geometry</run_depend>
+  <run_depend>message_filters</run_depend>
   <export>
     <!-- Other tools can request additional information be placed here -->
 

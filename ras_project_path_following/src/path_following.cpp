@@ -10,6 +10,8 @@ int distance_ok = 0;
 
 void teleopCallback (const geometry_msgs::Pose2D::ConstPtr& msg) {
    pose = *msg;
+   angle_ok = 0;
+   distance_ok = 0;
 }
 
 void odometryCallback (const geometry_msgs::Pose2D::ConstPtr& msg) {
@@ -17,10 +19,13 @@ void odometryCallback (const geometry_msgs::Pose2D::ConstPtr& msg) {
    geometry_msgs::Twist move;
    double theta = atan2(pose.y-robot_pose.y, pose.x-robot_pose.x);
    ROS_INFO("Angle desired: %f", theta-robot_pose.theta);
-   if (std::abs(theta-robot_pose.theta) < 0.1) {
-   	double distance = std::sqrt(std::pow(pose.x-robot_pose.x,2)+std::pow(pose.y-robot_pose.y,2));
-	if (distance > 0.01 && angle_ok == 0) {
-	    move.linear.x = 0.05;
+   double distance = std::sqrt(std::pow(pose.x-robot_pose.x,2)+std::pow(pose.y-robot_pose.y,2));
+   if (std::abs(theta-robot_pose.theta) < 0.18 || distance <= 0.03) {
+	if (distance > 0.03) {
+	    if (distance > 0.1)
+	    	move.linear.x = 0.02;
+	    else
+		move.linear.x = distance/10;
 	    move.angular.z = 0;
 	    motor_pub.publish(move);
 	    ROS_INFO("%f",distance);
@@ -31,9 +36,20 @@ void odometryCallback (const geometry_msgs::Pose2D::ConstPtr& msg) {
 	    motor_pub.publish(move);
 	}
    }
-   else if (angle_ok == 0){
+   else {
 	move.linear.x = 0;
-	move.angular.z = 0.05;
+	if (std::abs(theta-robot_pose.theta) > 0.20) {
+	    if (theta-robot_pose.theta > 0)
+	    	move.angular.z = 0.1;
+	    else
+		move.angular.z = -0.1;
+	}
+	else {
+	    if (theta-robot_pose.theta > 0)
+	    	move.angular.z = 0.1;
+	    else
+		move.angular.z = -0.1;
+	}
 	double distance = std::sqrt(std::pow(pose.x-robot_pose.x, 2) + std::pow(pose.y-robot_pose.y, 2));
 	ROS_INFO("%f ; %f", std::abs(theta-robot_pose.theta), distance);
 	motor_pub.publish(move);

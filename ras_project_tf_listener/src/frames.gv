@@ -1,0 +1,13 @@
+digraph G {
+"robot" -> "camera"[label="Broadcaster: /camera_broadcaster\nAverage rate: 998.600 Hz\nMost recent transform: 1507818480.376 ( 0.001 sec old)\nBuffer length: 4.994 sec\n"];
+"robot" -> "uarm_base"[label="Broadcaster: /uArmbase_broadcaster\nAverage rate: 997.943 Hz\nMost recent transform: 1507818480.376 ( 0.001 sec old)\nBuffer length: 4.993 sec\n"];
+"uarm" -> "eef"[label="Broadcaster: /kth_uarm_core\nAverage rate: 2.083 Hz\nMost recent transform: 1507818479.999 ( 0.378 sec old)\nBuffer length: 4.321 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1507818480.377"[ shape=plaintext ] ;
+ }->"robot";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1507818480.377"[ shape=plaintext ] ;
+ }->"uarm";
+}

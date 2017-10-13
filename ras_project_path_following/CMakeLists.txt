@@ -6,6 +6,7 @@ project(ras_project_path_following)
 catkin_package()
 include_directories(
     ${catkin_INCLUDE_DIRS}
+    #    ${Eigen_INCLUDE_DIRS}
     )
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -15,6 +16,9 @@ find_package(catkin REQUIRED
             std_msgs
             tf
             sensor_msgs
+            message_filters
+            laser_geometry
+            Eigen REQUIRED
             )
 
 ## System dependencies are found with CMake's conventions
@@ -126,6 +130,8 @@ find_package(catkin REQUIRED
 
 add_executable(path_following src/path_following.cpp)
 target_link_libraries(path_following ${catkin_LIBRARIES})
+#add_executable(collision_detection src/collision_detection.cpp)
+#target_link_libraries(path_following ${catkin_LIBRARIES})
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/ras_project_lidar.cpp

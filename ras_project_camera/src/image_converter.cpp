@@ -5,7 +5,7 @@
 #include <sensor_msgs/Image.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
+//#include <geometry_msgs/Point.h>
 static const std::string OPENCV_WINDOW = "Image window";
 
 class ImageConverter
@@ -23,9 +23,12 @@ public:
     image_sub_ = it_.subscribe("/camera/rgb/image_raw", 1,
       &ImageConverter::imageCb, this);
     image_pub_ = it_.advertise("/image_converter/output_video", 1);
-
+    //object_coord_pub = it_.advertise<geometry_msgs::Point>("/camera/object_coord",1)
     cv::namedWindow(OPENCV_WINDOW);
   }
+  //ros::NodeHandle nh("~");
+  //nh.getParam("serial", serial_number);
+  //std::string name = "motorcontrol";
 
   ~ImageConverter()
   {
@@ -46,16 +49,70 @@ public:
     }
 
     // Draw an example circle on the video stream
-    if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
-      cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
+    //if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
+    //  cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
 
     // Update GUI Window
     cv::imshow(OPENCV_WINDOW, cv_ptr->image);
     cv::waitKey(3);
 
     // Output modified video stream
-    ;
-    image_pub_.publish(cv_ptr->toImageMsg());
+    //image_pub_.publish(cv_ptr->toImageMsg());
+
+    //Image processing
+
+    cv::Mat rgb_frame;
+    cv::Mat hsv_frame;
+    cv::Mat thresholded_frame;
+
+    //float s = 0.5;
+	//cv::resize( cv_ptr->image, rgb_frame, cv::Size(), s, s, cv::INTER_NEAREST);
+	cv::GaussianBlur(cv_ptr->image, rgb_frame, cv::Size(5,5),50);
+	cv::cvtColor(rgb_frame, hsv_frame, CV_RGB2HSV);
+    cv::Scalar   min(80/2,80,60);
+    cv::Scalar   max(140/2,150,150);
+    cv::inRange(hsv_frame, min, max, thresholded_frame);
+
+    cv::vector<cv::vector<cv::Point> > contours;
+	cv::vector<cv::Vec4i> heirarchy;
+	cv::vector<cv::Point2i> center;
+	cv::vector<int> radius;
+	int minTargetRadius = 50;
+	
+	cv::findContours( thresholded_frame.clone(), contours, heirarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
+ 
+	size_t count = contours.size();
+ 
+	for( int i=0; i<count; i++)
+	{
+	    cv::Point2f c;
+	    float r;
+    	cv::minEnclosingCircle( contours[i], c, r);
+ 
+    	if ( r >= minTargetRadius)
+    	{
+        	center.push_back(c);
+        	radius.push_back(r);
+    	}
+	}
+
+	size_t counts = center.size();
+	//cv::Scalar red(255,0,0);
+ 
+	for( int i = 0; i < counts; i++)
+	{
+    	cv::circle(thresholded_frame, center[i], radius[i], red, 3);
+	}
+
+	//geometry_msgs::Point object_coord;
+	//S_INFO("%d x center coord %d y center  serial_number);
+  //object_coord_pub.publish
+
+
+    cv::imshow(OPENCV_WINDOW, thresholded_frame);
+    cv::waitKey(3);
+
+
   }
 };
 

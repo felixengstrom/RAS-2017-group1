@@ -24,12 +24,16 @@ sensor_msgs
 image_transport
 cv_bridge 
 )
+catkin_python_setup()
 
 include_directories(
     ${catkin_INCLUDE_DIRS}
     )
 
-#add_executable(object_recognition src/object_recognition.cpp)
-#target_link_libraries(object_recognition ${catkin_LIBRARIES})
-add_executable(image_converter src/image_converter.cpp)
-target_link_libraries(image_converter ${catkin_LIBRARIES})
+
+#add_executable(image_converter src/image_converter.cpp)
+add_executable(object_tf_node src/objectPosition_transform.cpp)
+add_executable(camera_tf_node src/camera_transform.cpp)
+#target_link_libraries(image_converter ${catkin_LIBRARIES})
+target_link_libraries(camera_tf_node ${catkin_LIBRARIES})
+target_link_libraries(object_tf_node ${catkin_LIBRARIES})

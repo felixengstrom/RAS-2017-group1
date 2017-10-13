@@ -10,15 +10,17 @@ int main( int argc, char ** argv)
         tf::Transform transform;
         tf::Quaternion q;
 
-        ros::Rate rate(10.0);
+        ros::Rate rate(1000.0);
         while (n.ok())
         {
-            transform.setOrigin(tf::Vector3(0.0,0.0,0.0));/*Set the values after measuring*/
-            q.setRPY(0,0,0);/*Set the angle of orientation*/
+            transform.setOrigin(tf::Vector3(0.13,0.0,0.125));
+            q.setRPY(0,-0.105,0);
+            //transform.setOrigin(tf::Vector3(.274,0.0,-0.049));
+            q.setRPY(0,0.0,0);
             transform.setRotation(q);
             br.sendTransform(tf::StampedTransform(transform, ros::Time::now(),"robot","camera"));
-                                                                                    rate.sleep();
-                                                                                        }
+            rate.sleep();
+        }
 
     return 0;
 

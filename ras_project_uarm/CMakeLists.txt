@@ -5,18 +5,29 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   geometry_msgs
+  tf
+  message_generation
 )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+generate_messages(
+    DEPENDENCIES
+    std_msgs
+)
 
 catkin_package(
 )
 
-add_executable(uarm_control_node src/uarm_control.cpp)
 
+add_executable(uarm_control_node src/uarm_control.cpp)
+add_dependencies(uarm_control_node ras_project_uarm_generate_messages_cpp)
 target_link_libraries(uarm_control_node
   ${catkin_LIBRARIES}
 )
 
+add_executable(uarm_transform_node src/uArm_transform.cpp)
+target_link_libraries(uarm_transform_node
+      ${catkin_LIBRARIES}
+)
