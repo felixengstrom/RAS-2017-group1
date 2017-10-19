@@ -26,9 +26,26 @@ public:
     //object_coord_pub = it_.advertise<geometry_msgs::Point>("/camera/object_coord",1)
     cv::namedWindow(OPENCV_WINDOW);
   }
-  //ros::NodeHandle nh("~");
-  //nh.getParam("serial", serial_number);
+  ros::NodeHandle nh("~");
+  //int h_max, s_max, v_max, h_min, s_min, v_min;
+
+  int h_max = 80;
+  int s_max = 255;
+  int v_max = 255;
+  int h_min = 40;
+  int s_min = 0;
+  int v_min = 0;
+
+  nh.getParam("h_max",h_max);
+  nh.getParam("s_max",s_max);
+  nh.getParam("v_max",v_max);
+  nh.getParam("h_min",h_min);
+  nh.getParam("s_min",s_min);
+  nh.getParam("v_min",v_min);
+
   //std::string name = "motorcontrol";
+
+
 
   ~ImageConverter()
   {
@@ -67,10 +84,14 @@ public:
 
     //float s = 0.5;
 	//cv::resize( cv_ptr->image, rgb_frame, cv::Size(), s, s, cv::INTER_NEAREST);
-	cv::GaussianBlur(cv_ptr->image, rgb_frame, cv::Size(5,5),50);
+	cv::GaussianBlur(cv_ptr->image, rgb_frame, cv::Size(9,9),50);
 	cv::cvtColor(rgb_frame, hsv_frame, CV_RGB2HSV);
-    cv::Scalar   min(80/2,80,60);
-    cv::Scalar   max(140/2,150,150);
+    //cv::Scalar   min(30,80,60);
+    //cv::Scalar   max(80,150,150);
+
+    cv::Scalar   min(h_min,s_min,v_min);
+    cv::Scalar   max(h_max,s_max,v_max);
+
     cv::inRange(hsv_frame, min, max, thresholded_frame);
 
     cv::vector<cv::vector<cv::Point> > contours;
@@ -97,7 +118,7 @@ public:
 	}
 
 	size_t counts = center.size();
-	//cv::Scalar red(255,0,0);
+	cv::Scalar red(255,0,0);
  
 	for( int i = 0; i < counts; i++)
 	{

@@ -18,7 +18,7 @@ void transformPoint(const tf::TransformListener& listener)
     object_point.header.stamp = ros::Time();
 
     /* Here the x,y,z position of the object wrt the camera frame are take */ 
-    object_point.point.x = 0.04;
+    object_point.point.x = 0.1;
     object_point.point.y = 0.0;
     object_point.point.z = -0.17;
  
