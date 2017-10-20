@@ -12,6 +12,12 @@ find_package(catkin REQUIRED COMPONENTS
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+
+add_service_files(
+  FILES
+  MoveArmCartesian.srv
+)
+
 generate_messages(
     DEPENDENCIES
     std_msgs
@@ -21,10 +27,6 @@ catkin_package(
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs
 )
 
-add_service_files(
-  FILES
-  MoveArmCartesian.srv
-)
 
 add_executable(uarm_control_node src/uarm_control.cpp)
 add_dependencies(uarm_control_node ras_project_uarm_generate_messages_cpp)

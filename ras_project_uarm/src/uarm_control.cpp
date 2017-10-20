@@ -4,7 +4,7 @@
 #include <std_msgs/Int32.h>
 #include "uarm/MoveToJoints.h"
 #include "uarm/Pump.h"
-//#include "ras_project_uarm/MoveArmCartesian.h"
+#include "ras_project_uarm/MoveArmCartesian.h"
 
 static const double PI = acos(-1);
 static const double ROBOT_RADIUS = 0.22;
@@ -34,11 +34,12 @@ class UarmController{
         ros::ServiceClient client; ros::ServiceClient client2;
     
     public:
+        ros::ServiceServer service;
         bool moveArm(double x, double y, double z);
         UarmController(ros::NodeHandle& nh);
         void moveToPointCallback(const geometry_msgs::Point::ConstPtr& msg);
- //       void moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
-//                                ras_project_uarm::MoveArmCartesian::Response &res);
+        bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
+                                ras_project_uarm::MoveArmCartesian::Response &res);
         void engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg);
         AngleSetting invKinematic(double x,double y,double z);
 };
@@ -46,6 +47,7 @@ class UarmController{
 UarmController::UarmController(ros::NodeHandle& nh)
 {
     n = nh;
+
     ros::NodeHandle n_("~");
 
     j0_start = 80;
@@ -73,7 +75,7 @@ UarmController::UarmController(ros::NodeHandle& nh)
     n_.getParam("d4", d4);
     n_.getParam("d5", d5);
 
-  //  ros::ServiceServer service = n.advertiseService("/uarm/moveToPose", moveToPointService);
+    service = n.advertiseService("/uarm/moveToPose", &UarmController::moveToPointService, this);
 
     client = n.serviceClient<uarm::MoveToJoints>("/uarm/move_to_joints");
     client2 = n.serviceClient<uarm::Pump>("/uarm/pump");
@@ -92,9 +94,9 @@ void UarmController::moveToPointCallback(const geometry_msgs::Point::ConstPtr& m
         this->moveArm(msg->x,msg->y,msg->z);
     }
 }
-//bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
-//                        ras_project_uarm::MoveArmCartesian::Response &res)
-//{
+bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
+                        ras_project_uarm::MoveArmCartesian::Response &res)
+{
     
 //    if (pow(req->x,2) + pow(req->y,2) < pow(ROBOT_RADIUS, 2) && req->z<ROBOT_HEIGHT)
 //    {
@@ -104,7 +106,8 @@ void UarmController::moveToPointCallback(const geometry_msgs::Point::ConstPtr& m
 //    {
 //        return this->moveArm(msg->x,msg->y,msg->z);
 //    }
-//}
+    return true;
+}
 AngleSetting UarmController::invKinematic(double x,double y,double z)
 {   
     //Calculate first angle
@@ -172,7 +175,6 @@ int main(int argc, char* argv[])
   ros::NodeHandle n;
   
   UarmController uc = UarmController(n);
-  ros::Rate loop_rate(1);
   ros::NodeHandle nh("~");
   
   bool waitForArm = false;
@@ -190,11 +192,11 @@ int main(int argc, char* argv[])
   bool uarm_started = ros::service::waitForService("/uarm/move_to_joints", 5000);
   if (uarm_started){
     uc.moveArm(x_start,y_start,z_start);
-    ROS_INFO("move arm tried");
   } else { 
-      ROS_INFO("no uarm service running");
+      ROS_INFO("No uarm service running");
   }
 
+  ros::Rate loop_rate(1);
   while(ros::ok()){
       ros::spinOnce();
       loop_rate.sleep();
