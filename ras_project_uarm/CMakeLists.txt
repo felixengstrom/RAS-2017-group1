@@ -25,7 +25,7 @@ generate_messages(
 )
 
 catkin_package(
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs tf
 )
 
 

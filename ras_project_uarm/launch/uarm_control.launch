@@ -1,5 +1,5 @@
 <launch>
-   <include file="$(find uarm)/launch/kth_uarm.launch" />
+   <!--include file="$(find uarm)/launch/kth_uarm.launch" /-->
     <node name="uarm_control" pkg="ras_project_uarm" type="uarm_control_node" output="screen">
         <param name="waitForArm" type="bool" value="true" />
         <param name="j0_start" type="double" value="82" />
@@ -7,5 +7,6 @@
         <param name="j2_start" type="double" value="-31" />
         <param name="j3_start" type="double" value="93" />
     </node>
+    <node name="uarmbase_broadcaster" pkg="ras_project_uarm" type="uarm_transform_node" output="screen"/>
 </launch>
 
