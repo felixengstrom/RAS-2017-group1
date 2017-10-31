@@ -10,14 +10,14 @@ void transformPoint(const tf::TransformListener& listener)
     tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
-    //we'll create a point in the base_laser frame that we'd like to transform to the base_link frame
+    //we'll create a point in the camera frame that we'd like to transform to the robot frame
     geometry_msgs::PointStamped object_point;
     object_point.header.frame_id = "camera";
  
     //we'll just use the most recent transform available for our simple example
     object_point.header.stamp = ros::Time();
 
-    /* Here the x,y,z position of the object wrt the camera frame are take */ 
+    /* Here the x,y,z position of the object wrt the camera frame are taken */
     object_point.point.x = 0.1;
     object_point.point.y = 0.0;
     object_point.point.z = -0.17;

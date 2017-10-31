@@ -1,70 +1,45 @@
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
-#include <geometry_msgs/Point.h>
-#include <std_msgs/Int32.h>
-class CoordinateTransformer{
+#include <geometry_msgs/PointStamped.h>
+#include <ras_project_uarm/MoveArmCartesian.h>
 
+int main(int argc, char** argv){
+  ros::init(argc, argv, "tf_listener");
 
-    tf::TransformListener listener;
-	ros::NodeHandle node;
-    ros::Subscriber sub;
-	ros::Publisher uArmObj_position;
+  ros::NodeHandle node;
+  ros::ServiceClient client = node.serviceClient<ras_project_uarm::MoveArmCartesian>("/uarm/moveToPose");
+  ras_project_uarm::MoveArmCartesian srv;
+  tf::TransformListener listener;
 
-    public:
-    void pickupCallback(const std_msgs::Int32::ConstPtr& msg);
-    CoordinateTransformer(ros::NodeHandle& n);
-
-};
-
-CoordinateTransformer::CoordinateTransformer(ros::NodeHandle& n)
-{
-    node = n;
-    sub = node.subscribe("pickup", 1, &CoordinateTransformer::pickupCallback, this);
-	uArmObj_position =
-	    node.advertise<geometry_msgs::Point>("uarm/moveToPose", 10);
-
-
-}
-void CoordinateTransformer::pickupCallback(const std_msgs::Int32::ConstPtr& msg){
-
-    if (true){
+  ros::Rate rate(10.0);
+  while (node.ok())
+  {
     tf::StampedTransform transform;
     try
     {
-        listener.lookupTransform("uarm_base", "object",ros::Time(0), transform);
+      listener.lookupTransform("uarm_base", "object",
+                               ros::Time(0), transform);
     }
     catch (tf::TransformException &ex)
     {
-        ROS_ERROR("%s",ex.what());
+      ROS_ERROR("%s",ex.what());
+      ros::Duration(1.0).sleep();
+      continue;
     }
 
-        geometry_msgs::Point uArmObjPos_msg;
-        uArmObjPos_msg.x = transform.getOrigin().x();
-        uArmObjPos_msg.y = transform.getOrigin().y();
-        uArmObjPos_msg.z = transform.getOrigin().z();
-        uArmObj_position.publish(uArmObjPos_msg);
-        ROS_INFO("should be sending");
-    } else {
-        geometry_msgs::Point uArmObjPos_msg;
-        uArmObjPos_msg.x = 0.15;
-        uArmObjPos_msg.y = 0;
-        uArmObjPos_msg.z = 0.15;
-    }
+    geometry_msgs::PointStamped uArmObjPos_msg;
+    uArmObjPos_msg.point.x = transform.getOrigin().x();
+    uArmObjPos_msg.point.y = transform.getOrigin().y();
+    uArmObjPos_msg.point.z = transform.getOrigin().z();
+    uArmObjPos_msg.header.frame_id = "uArm_base";
+    uArmObjPos_msg.header.stamp = ros::Time();
+    ROS_INFO("object -----> uArm_base: (%.2f, %.2f, %.2f) at time %.2f",
+    uArmObjPos_msg.point.x, uArmObjPos_msg.point.y, uArmObjPos_msg.point.z, uArmObjPos_msg.header.stamp.toSec());
+    srv.request.point = uArmObjPos_msg;
+    if(client.call(srv))
+        ROS_INFO("%d",srv.response.error);
 
-}
-
-int main(int argc, char** argv)
-{
-	ros::init(argc, argv, "tf_listener");
-    ros::NodeHandle n;
-
-    CoordinateTransformer tf(n);
-
-    ros::Rate rate(1.0);
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        rate.sleep();
-    }
-    return 0;
+    rate.sleep();
+  }
+  return 0;
 }
