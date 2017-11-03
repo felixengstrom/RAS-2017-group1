@@ -4,23 +4,29 @@
 #include <geometry_msgs/PointStamped.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-  
+
+static geometry_msgs::PointStamped object_point;
+
+void objectPosition_Callback(const geometry_msgs::Point::ConstPtr& msg)
+{
+  /* Here the x,y,z position of the object wrt the camera frame are taken */
+  object_point.point.x = msg->x;
+  object_point.point.y = msg->y;
+  object_point.point.z = msg->z;
+}
+
 void transformPoint(const tf::TransformListener& listener)
 {
     static tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
     //we'll create a point in the camera frame that we'd like to transform to the robot frame
-    geometry_msgs::PointStamped object_point;
+
     object_point.header.frame_id = "camera";
  
     //we'll just use the most recent transform available for our simple example
     object_point.header.stamp = ros::Time(0);
 
-    /* Here the x,y,z position of the object wrt the camera frame are taken */
-    object_point.point.x = 0.1;
-    object_point.point.y = 0.0;
-    object_point.point.z = -0.17;
  
 try{
     geometry_msgs::PointStamped object_point_base;
@@ -45,7 +51,8 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "object_position_transform");
     ros::NodeHandle n;
-    tf::TransformListener listener(ros::Duration(100));
+    tf::TransformListener listener(ros::Duration(10));
+    ros::Subscriber sub = n.subscribe("camera/world_coord", 1, objectPosition_Callback);
   
    //we'll transform a point once every second
    ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener)));
