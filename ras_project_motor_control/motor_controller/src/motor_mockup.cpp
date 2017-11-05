@@ -3,13 +3,14 @@
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
 #include <stdlib.h>
+#include <random>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 
 double lin_vel_;
 double ang_vel_;
-const static int PI = acos(-1);
+const static float PI = acos(-1);
 
 
 void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
@@ -20,6 +21,9 @@ void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
 
 int main (int argc, char **argv)
 {
+    std::default_random_engine rng;
+    std::normal_distribution<double> noise(0.0, 0.01);
+
     ros::init(argc, argv, "motor_controller");
     ros::NodeHandle n_;
 
@@ -28,22 +32,46 @@ int main (int argc, char **argv)
     
     teleop_sub = n_.subscribe("motor_teleop/twist", 10, teleopCallback);
     est_vel_pub = n_.advertise<geometry_msgs::Twist>("est_robot_vel/twist", 10);
-    sim_vel_pub = n_.advertise<geometry_msgs::Twist>("simualiton/velocity", 10);
+
+    geometry_msgs::PoseStamped truepose;
+    tf::TransformBroadcaster br;
+    
+    tf::Transform transform;
+    tf::Quaternion q;
     
     ros::Rate loop_rate(10);
+
+    float current_x = 0.22; 
+    float current_y = 0.22;
+
+    float current_omega = PI/2.;
+
+    transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
+    q.setRPY(0, 0, current_omega);
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "robot"));
+
+    ros::Rate rate(10);
 
     while(ros::ok())
     {
             
-            geometry_msgs::Twist mes;
+        current_x = current_x + 0.1 *lin_vel_*cos(current_omega + ang_vel_*0.05);
+        current_y = current_y + 0.1 *lin_vel_*sin(current_omega + ang_vel_*0.05);
+        current_omega = current_omega + ang_vel_*0.1;
+            
+        q.setRPY(0, 0, current_omega);
+        transform.setRotation(q);
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "truepos"));
+        geometry_msgs::Twist mes;
 
-            // Todo: add noice to simulate error inm essurements
-            mes.linear.x = lin_vel_;
-            mes.angular.z = ang_vel_;
+        // Todo: add noice to simulate error inm essurements
+        mes.linear.x = lin_vel_ + lin_vel_*noise(rng)*5;
+        mes.angular.z = ang_vel_+ ang_vel_*noise(rng);
 
-            est_vel_pub.publish(mes);
+        est_vel_pub.publish(mes);
 
-            // Todo: add code to publish simulated postion on map
+        // Todo: add code to publish simulated postion on map
 
         ros::spinOnce();
         loop_rate.sleep();

@@ -22,14 +22,15 @@ class OdometryNode
         OdometryNode() 
         {
             time = ros::Time::now();
-            current_x = current_y = current_omega = 0;
+            current_x = 0.22;
+            current_y = 0.22;
+            current_omega = PI/2;
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
 	    odom_pub = n_.advertise<geometry_msgs::Pose2D>("robot/pose", 1000);
         }
         void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
 };
-
 
 void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
 {
@@ -44,7 +45,6 @@ void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
     if (current_omega > PI) {
 	current_omega = fmod(current_omega,PI)-PI;
     }
-    ROS_INFO("x:%f y:%f, omega:%f", current_x, current_y, current_omega);
     geometry_msgs::Pose2D pose;
     pose.x = current_x;
     pose.y = current_y;
@@ -53,7 +53,7 @@ void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "robot"));
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "robot"));
 }
 
 int main(int argc, char ** argv){
