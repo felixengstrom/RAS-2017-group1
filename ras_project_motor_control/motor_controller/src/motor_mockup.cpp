@@ -24,7 +24,7 @@ int main (int argc, char **argv)
     std::default_random_engine rng;
     std::normal_distribution<double> noise(0.0, 0.01);
 
-    ros::init(argc, argv, "motor_controller");
+    ros::init(argc, argv, "motor_controller_mockup");
     ros::NodeHandle n_;
 
     ros::Subscriber teleop_sub;
@@ -50,20 +50,25 @@ int main (int argc, char **argv)
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "robot"));
+    ros::Time last  = ros::Time::now();
 
     ros::Rate rate(10);
 
     while(ros::ok())
-    {
-            
-        current_x = current_x + 0.1 *lin_vel_*cos(current_omega + ang_vel_*0.05);
-        current_y = current_y + 0.1 *lin_vel_*sin(current_omega + ang_vel_*0.05);
+    {   
+        ros::Time current  = ros::Time::now();
+        ros::Duration elapsed = current-last;
+        last = current;
+        current_x = current_x +elapsed.toSec()*lin_vel_*cos(current_omega + ang_vel_*0.05);
+        current_y = current_y +elapsed.toSec()*lin_vel_*sin(current_omega + ang_vel_*0.05);
         current_omega = current_omega + ang_vel_*0.1;
             
         q.setRPY(0, 0, current_omega);
+        transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
         transform.setRotation(q);
         br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "truepos"));
         geometry_msgs::Twist mes;
+        ROS_INFO("%f, %f",current_x, current_y);
 
         // Todo: add noice to simulate error inm essurements
         mes.linear.x = lin_vel_ + lin_vel_*noise(rng)*5;

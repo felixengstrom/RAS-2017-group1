@@ -90,7 +90,7 @@ std::vector<float> FakeLidar::rayTrace()
     for(int a = 0; a<n_angles; a++)
     {
         int n_walls = map.size();
-        float angle_n = angle + angle_increment*a-PI;
+        float angle_n = angle + angle_increment*a;
         float ca = cos(angle_n);
         float sa = sin(angle_n);
         dists[a] = 10;
