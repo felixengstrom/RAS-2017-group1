@@ -1,10 +1,11 @@
-#include <ros/ros.h>
 #include <math.h>
-#include <geometry_msgs/Point.h>
+#include <ros/ros.h>
+#include "uarm/Pump.h"
 #include <std_msgs/Int32.h>
 #include "uarm/MoveToJoints.h"
-#include "uarm/Pump.h"
-//#include "ras_project_uarm/MoveArmCartesian.h"
+#include "tf/transform_listener.h"
+#include <geometry_msgs/PointStamped.h>
+#include "ras_project_uarm/MoveArmCartesian.h"
 
 static const double PI = acos(-1);
 static const double ROBOT_RADIUS = 0.22;
@@ -28,24 +29,28 @@ class UarmController{
     private:
         double j0_start, j1_start, j2_start, j3_start;
         double d0, d1, d2, d3, d4, d5;
+        std::string arm_frame;
+        tf::TransformListener tf_;
         ros::NodeHandle n;
         ros::Subscriber sub;
         ros::Subscriber sub2;
-        ros::ServiceClient client; ros::ServiceClient client2;
+        ros::ServiceClient client;
+        ros::ServiceClient client2;
+        ros::ServiceServer service;
     
     public:
+        UarmController();
         bool moveArm(double x, double y, double z);
-        UarmController(ros::NodeHandle& nh);
-        void moveToPointCallback(const geometry_msgs::Point::ConstPtr& msg);
- //       void moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
-//                                ras_project_uarm::MoveArmCartesian::Response &res);
+        void moveToPointCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
+        bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
+                                ras_project_uarm::MoveArmCartesian::Response &res);
         void engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg);
         AngleSetting invKinematic(double x,double y,double z);
 };
 
-UarmController::UarmController(ros::NodeHandle& nh)
+UarmController::UarmController() : tf_()
 {
-    n = nh;
+
     ros::NodeHandle n_("~");
 
     j0_start = 80;
@@ -72,8 +77,12 @@ UarmController::UarmController(ros::NodeHandle& nh)
     n_.getParam("d3", d3);
     n_.getParam("d4", d4);
     n_.getParam("d5", d5);
+    
+    arm_frame = "uarm_base";
+    
+    n_.getParam("frame", arm_frame);
 
-  //  ros::ServiceServer service = n.advertiseService("/uarm/moveToPose", moveToPointService);
+    service = n.advertiseService("/uarm/moveToPose", &UarmController::moveToPointService, this);
 
     client = n.serviceClient<uarm::MoveToJoints>("/uarm/move_to_joints");
     client2 = n.serviceClient<uarm::Pump>("/uarm/pump");
@@ -82,29 +91,67 @@ UarmController::UarmController(ros::NodeHandle& nh)
     sub2 = n.subscribe("uarm/engageSuction",1, &UarmController::engageSuctionCallback, this);
 }
 
-void UarmController::moveToPointCallback(const geometry_msgs::Point::ConstPtr& msg)
+void UarmController::moveToPointCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
-    if (pow(msg->x,2) + pow(msg->y,2) < pow(ROBOT_RADIUS, 2) && msg->z<ROBOT_HEIGHT)
+    geometry_msgs::PointStamped point_robot_frame;
+
+    try
+    {
+        tf_.transformPoint(arm_frame, *msg, point_robot_frame);
+    }
+    catch (tf::TransformException &ex) 
+    {
+        ROS_INFO("Could not get transformation to perform moveToPointCallback");
+    }
+    float x = point_robot_frame.point.x;
+    float y = point_robot_frame.point.y;
+    float z = point_robot_frame.point.z;
+    ROS_INFO("x:%f, y:%f, z:%f", x, y, z);
+    
+    if (pow(x,2) + pow(y,2) < pow(ROBOT_RADIUS, 2) && z<ROBOT_HEIGHT)
     {
         ROS_INFO("Move not allowed, to close to robot");
     } else
     {
-        this->moveArm(msg->x,msg->y,msg->z);
+        this->moveArm(x,y,z);
     }
 }
-//bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
-//                        ras_project_uarm::MoveArmCartesian::Response &res)
-//{
+bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
+                        ras_project_uarm::MoveArmCartesian::Response &res)
+{
+    bool success = false;
+    geometry_msgs::PointStamped point_robot_frame;
+
+    try
+    {
+        tf_.transformPoint(arm_frame, req.point, point_robot_frame);
+    }
+    catch (tf::TransformException &ex) 
+    {
+        ROS_INFO("Could not get transformation to perform moveToPointCallback");
+        res.error = not(success);
+        return success;
+    }
+
+    float x = point_robot_frame.point.x;
+    float y = point_robot_frame.point.y;
+    float z = point_robot_frame.point.z;
+
+    ROS_INFO("x:%f, y:%f, z:%f", x, y, z);
     
-//    if (pow(req->x,2) + pow(req->y,2) < pow(ROBOT_RADIUS, 2) && req->z<ROBOT_HEIGHT)
-//    {
-//        ROS_INFO("Move not allowed, to close to robot");
-//        return is_success;
-//    } else
-//    {
-//        return this->moveArm(msg->x,msg->y,msg->z);
-//    }
-//}
+
+    if (pow(x,2) + pow(y,2) < pow(ROBOT_RADIUS, 2) && z<ROBOT_HEIGHT)
+    {
+        ROS_INFO("Move not allowed, to close to robot");
+    } else
+    {
+        bool success =this->moveArm(x,y,z);
+    }
+
+    res.error = not(success);
+    return success;
+}
+
 AngleSetting UarmController::invKinematic(double x,double y,double z)
 {   
     //Calculate first angle
@@ -151,6 +198,7 @@ void UarmController::engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg)
     }
 
 }
+
 bool UarmController::moveArm(double x, double y, double z)
 {
     AngleSetting angs = invKinematic(x, y, z);
@@ -169,10 +217,8 @@ bool UarmController::moveArm(double x, double y, double z)
 int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "uarm_control");
-  ros::NodeHandle n;
   
-  UarmController uc = UarmController(n);
-  ros::Rate loop_rate(1);
+  UarmController uc;
   ros::NodeHandle nh("~");
   
   bool waitForArm = false;
@@ -190,17 +236,13 @@ int main(int argc, char* argv[])
   bool uarm_started = ros::service::waitForService("/uarm/move_to_joints", 5000);
   if (uarm_started){
     uc.moveArm(x_start,y_start,z_start);
-    ROS_INFO("move arm tried");
   } else { 
-      ROS_INFO("no uarm service running");
+      ROS_INFO("No uarm service running");
   }
 
+  ros::Rate loop_rate(1);
   while(ros::ok()){
       ros::spinOnce();
       loop_rate.sleep();
    }
 }
-
-
-
-
