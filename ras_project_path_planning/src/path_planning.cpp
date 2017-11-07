@@ -57,7 +57,7 @@ class PathPlanning
 		C_pub  = n.advertise<nav_msgs::OccupancyGrid>("maze_CSpace",1000);
 		}
 		void OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg); // Creates C-space Csp
-		void Path(int x0, int y0, int x1,int y1); // A* evaluates path
+		void Path(double x0, double y0, double x1,double y1); // A* evaluates path
 		void Reconstruct_path(int curr_index); //Reconstruct path from Path() WITH SMOOTHING
 		bool Checkline(int start, int goal); //used in Reconstruct_path, check if line between two points [start,goal] is empty
 };
@@ -107,8 +107,19 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 			}
 		
 		}
+	double q,w,e,r;
+	q=0.14;w=0.16;e=1.0;r=1.0;
+	Path(q,w,e,r);
+	
 	}
-
+	ROS_INFO_STREAM("following smoothed path points were calculated (size of vector:  "<<path_list.size() << " ) ");
+	for(int i=0;i<path_list.size();i++)
+	{
+		int Q,W;
+		Q=path_list[i]%width_height;
+		W=(int)(path_list[i]/width_height);
+		ROS_INFO_STREAM(" x = " << Q << " y = " << W);
+	}
 	nav_msgs::OccupancyGrid C_space;
 	C_space.info.resolution=res;
 	C_space.info.width = width_height;
@@ -121,7 +132,7 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 }
 
 
-void PathPlanning::Path(int x0, int y0, int x1, int y1)
+void PathPlanning::Path(double x0, double y0, double x1, double y1)
 {
 
 //A*
@@ -133,6 +144,16 @@ int y_cell = (int)(y1/res);
 
 int x_start = (int)(x0/res);
 int y_start = (int)(y0/res);
+if(Csp[x_cell+y_cell*width_height]!=0)
+{
+	ROS_INFO_STREAM("thats a wall");
+	return;
+}
+//Reset values
+path_list.clear();
+cameFrom.clear();
+
+
 
 std::map <int,point> openSet;
 //goal pos
@@ -149,30 +170,37 @@ int tmp1=startpos.x+width_height*startpos.y;
 openSet.insert(std::pair<int,point>(tmp1,startpos));
 cameFrom.insert(std::pair<int,int>(tmp1,tmp1));
 std::map<int,point> closeSet;
+int amount;
+amount=0;
 //Herustic h(s0,s1) = abs(s1-s0)
 while(openSet.size()!=0)
 {
+	
 	//Check for lowest f value	
 	std::map<int,point>::iterator element = std::min_element(openSet.begin(),openSet.end(),cmp);
 	//int D = std::distance(openSet.begin(),element); //Index of biggest f
 	int D = element->first;
+//ROS_INFO_STREAM("at least got here i= "<< amount << " D = " << D);
 	point current= openSet[D];
 	int curr_index = current.x+current.y*width_height;
 	if(current.x==goalpos.x && current.y==goalpos.y)
 	{Reconstruct_path(curr_index);return;}
 	closeSet.insert(std::pair<int,point>(curr_index,current));
 	openSet.erase(D);
-	//
+	//ROS_INFO_STREAM("comparison: openset size: " << openSet.size() << " also curr_index: " << curr_index << " D : " << D);
 	for(int i=-1; i<=1; i++)
 	{
 		for(int j=-1;j<=1;j++)
 		{
 			if(i==0 && j==0){continue;}
 			int iter_index = curr_index+j+i*width_height;
+		//	ROS_INFO_STREAM("iter_index = " << iter_index << "CSP OF IT = " << (int)Csp[iter_index]);
+			if(iter_index < 0 || iter_index > width_height*width_height) {continue;} //out of bound
 			if(Csp[iter_index]!=0){continue;}//check for wall / obstacle
+			
 			if(closeSet.find(iter_index)!=closeSet.end()){continue;}//check if already exist in closedset
 			point neighbour;
-			neighbour.x=current.x+j; neighbour.y=current.x+i;
+			neighbour.x=current.x+j; neighbour.y=current.y+i;
 			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2));
 			neighbour.f=neighbour.g+heuristic(neighbour,goalpos);
 			
@@ -186,8 +214,8 @@ while(openSet.size()!=0)
 
 		}
 	}
-			
-
+	amount=amount+1;		
+	//ROS_INFO_STREAM("A* iteration: " << amount << " size of openSet: " << openSet.size()<< "  D = " << D );
 
 }
 
@@ -224,6 +252,7 @@ while(parent!=child)
 	smooth=child;
 
 }
+reverse_smooth.push_back(parent);
 std::reverse(reverse_smooth.begin(),reverse_smooth.end());
 path_list=reverse_smooth;
 return;
