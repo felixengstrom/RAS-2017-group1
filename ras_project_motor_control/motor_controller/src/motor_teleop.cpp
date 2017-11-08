@@ -110,6 +110,12 @@ void TeleopTurtle::keyLoop()
         linear_ = -1.0;
         dirty = true;
         break;
+      case ' ':
+        ROS_DEBUG("DOWN");
+        linear_ = 0.0;
+        angular_ = 0.0;
+        dirty = true;
+        break;
     }
    
 

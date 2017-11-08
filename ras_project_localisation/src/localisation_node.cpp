@@ -138,10 +138,14 @@ void ParticleFilter::resample_particles()
     
     for ( int i = 0; i < nParticles; i++)
     {
-        double uni = rand()*1.0/RAND_MAX;  
+        double uni = rand()*sum/RAND_MAX;  
         int ind = cumulative.upper_bound(uni)->second;
+        //std::cout << uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
+        newPs[i].x += vel_noise(rng)*0.1;
+        newPs[i].y += vel_noise(rng)*0.1;
         newCh[i] = particles.channels[ind];
+        newCh[i].values[0] += vel_noise(rng)*0.1;
     }
 
     particles.points = newPs;
@@ -172,16 +176,17 @@ void ParticleFilter::update_particles_position()
     {
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
-        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng));
+        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)) + ang_noise(rng);
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
         omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
-        particles.points[i].x += cos(omega_n)*vt + 10*vt*(float)vel_noise(rng)*cos(omega_n);
-        particles.points[i].y += sin(omega_n)*vt + 10*vt*(float)vel_noise(rng)*sin(omega_n);
+        particles.points[i].x += cos(omega_n)*vt + vt*(float)vel_noise(rng)*cos(omega_n);
+        particles.points[i].y += sin(omega_n)*vt + vt*(float)vel_noise(rng)*sin(omega_n);
     }
 
     lastPose.header.stamp = t;
+
     if (hasScan){
         update_particles_weight();
         resample_particles();
@@ -202,6 +207,7 @@ void ParticleFilter::update_particles_position()
     mean_x = mean_x/nParticles;
     mean_y = mean_y/nParticles;
     double mean_omega = atan2(sum_sin, sum_cos);
+
     lastPose.header.stamp = t;
     lastPose.pose.position.x= mean_x;
     lastPose.pose.position.y= mean_y;
@@ -215,7 +221,8 @@ void ParticleFilter::update_particles_weight()
     int nAngles = laser_values.size();
 
     std::vector<int> inds;
-    float var = 1;
+    float var = 2;
+    double angle_increment = 2*PI/nAngles;
 
     //find values that are not infinate in the laser.
     for(int ind = 0; ind<nAngles;ind++)
@@ -227,7 +234,8 @@ void ParticleFilter::update_particles_weight()
             inds.push_back(ind);
         }
     }
-    nAngles = inds.size();
+    nScans = inds.size();
+   
 
     for (int i=0; i<nParticles;i++){
         geometry_msgs::Point32 p = particles.points[i];
@@ -238,7 +246,7 @@ void ParticleFilter::update_particles_weight()
 
         for (int j=0; j<nScans; j++)
         {
-            angles[j]=inds[j]*2*PI/nAngles;
+            angles[j]=inds[j]*angle_increment;
             dists[j] = laser_values[inds[j]];
         }
 
@@ -252,7 +260,6 @@ void ParticleFilter::update_particles_weight()
 
         particles.channels[i].values[1] = weight;
     }
-    ROS_INFO("particles_updated");
 }
 
 std::vector<float> ParticleFilter::rayTrace(const geometry_msgs::Point32 &pos, float angle, const std::vector<float> &angles)

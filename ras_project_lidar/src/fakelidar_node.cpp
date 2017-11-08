@@ -80,13 +80,8 @@ std::vector<float> FakeLidar::rayTrace()
     tf::StampedTransform transform;
     ros::Time t = ros::Time::now();
 
-    try {
-        listener.waitForTransform( "map","truepos",t, ros::Duration(1.0));
-        listener.lookupTransform("map","truepos", t, transform);
-    } catch( tf::TransformException &ex)
-    {
-        ROS_INFO("Transform failed in raytracer");
-    }
+    listener.waitForTransform( "map","truepos",t, ros::Duration(0.1));
+    listener.lookupTransform("map","truepos", t, transform);
 
     float x = transform.getOrigin().x();
     float y = transform.getOrigin().y();
@@ -122,7 +117,7 @@ std::vector<float> FakeLidar::rayTrace()
 
             if (y1*y2 < 0 and 
                 (((x1>0) or (x2>=0)) and((x1*y2 - x2*y1)*y2 > 0)) and
-                std::min(x1, x2)>dists[a])
+                std::min(x1, x2)<dists[a])
             {
                 dists[a] = (x1*y2-x2*y1)/(y2-y1) + dist_noise(rng);
             }
@@ -193,7 +188,13 @@ int main(int argc, char*argv[])
 
     while( ros::ok() )
     {
-        pub.publish(fl.fakeScan());
+        try {
+            pub.publish(fl.fakeScan());
+        } catch( tf::TransformException &ex)
+        {
+            ROS_INFO("Transform failed in raytracer");
+            std::cout << ex.what() << "\n";
+        }
         ros::spinOnce();
         rate.sleep();
 
