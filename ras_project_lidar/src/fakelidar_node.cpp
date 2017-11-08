@@ -43,7 +43,7 @@ sensor_msgs::LaserScan FakeLidar::fakeScan()
 {
     sensor_msgs::LaserScan fakey;
     std_msgs::Header h;
-    h.frame_id = "laser";
+    h.frame_id = "truepos";
     h.stamp = ros::Time();
     fakey.header = h;
     fakey.angle_min = -3.12413907051;
@@ -74,14 +74,23 @@ sensor_msgs::LaserScan FakeLidar::fakeScan()
 
 }
 
+
 std::vector<float> FakeLidar::rayTrace()
 {   
     tf::StampedTransform transform;
-    ros::Time t(0);
-    listener.waitForTransform( "map","truepos",t, ros::Duration(1.0));
-    listener.lookupTransform("map","truepos", t, transform);
+    ros::Time t = ros::Time::now();
+
+    try {
+        listener.waitForTransform( "map","truepos",t, ros::Duration(1.0));
+        listener.lookupTransform("map","truepos", t, transform);
+    } catch( tf::TransformException &ex)
+    {
+        ROS_INFO("Transform failed in raytracer");
+    }
+
     float x = transform.getOrigin().x();
     float y = transform.getOrigin().y();
+
     float angle = tf::getYaw(transform.getRotation());
 
     int n_angles= 360;
@@ -90,7 +99,7 @@ std::vector<float> FakeLidar::rayTrace()
     for(int a = 0; a<n_angles; a++)
     {
         int n_walls = map.size();
-        float angle_n = angle + angle_increment*a;
+        float angle_n = angle + angle_increment*a + PI;
         float ca = cos(angle_n);
         float sa = sin(angle_n);
         dists[a] = 10;
@@ -113,16 +122,14 @@ std::vector<float> FakeLidar::rayTrace()
 
             if (y1*y2 < 0 and 
                 (((x1>0) or (x2>=0)) and((x1*y2 - x2*y1)*y2 > 0)) and
-                std::min(x1, x2)<dists[a])
+                std::min(x1, x2)>dists[a])
             {
                 dists[a] = (x1*y2-x2*y1)/(y2-y1) + dist_noise(rng);
             }
         }
         if (dists[a]>6 or rand()%20 == 0){
             dists[a] = std::numeric_limits<double>::infinity();;
-                    
         }
-
     }
     return dists;
 }
@@ -177,16 +184,7 @@ int main(int argc, char*argv[])
     ROS_INFO_STREAM("Read "<<c<<" walls from map file.");
 
     ros::NodeHandle n;
-    geometry_msgs::PoseStamped _currentPose;
 
-    float x_start = 0.22;
-    float y_start = 0.22;
-
-    float omega_start = PI/2;
-
-    std_msgs::Header h;
-    h.frame_id= "robot";
-    h.stamp= ros::Time();
 
     ros::Rate rate(10);
     FakeLidar fl(map);
@@ -195,14 +193,7 @@ int main(int argc, char*argv[])
 
     while( ros::ok() )
     {
-        try
-        {
-            pub.publish(fl.fakeScan());
-        }
-        catch (tf::TransformException& ex)
-        {
-            ROS_INFO("failed to make transform");
-        }
+        pub.publish(fl.fakeScan());
         ros::spinOnce();
         rate.sleep();
 

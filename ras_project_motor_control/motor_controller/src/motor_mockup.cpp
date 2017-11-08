@@ -22,7 +22,7 @@ void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
 int main (int argc, char **argv)
 {
     std::default_random_engine rng;
-    std::normal_distribution<double> noise(0.0, 0.01);
+    std::normal_distribution<double> noise(0.0, 0.1);
 
     ros::init(argc, argv, "motor_controller_mockup");
     ros::NodeHandle n_;
@@ -68,11 +68,10 @@ int main (int argc, char **argv)
         transform.setRotation(q);
         br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "truepos"));
         geometry_msgs::Twist mes;
-        ROS_INFO("%f, %f",current_x, current_y);
 
         // Todo: add noice to simulate error inm essurements
-        mes.linear.x = lin_vel_ + lin_vel_*noise(rng)*5;
-        mes.angular.z = ang_vel_+ ang_vel_*noise(rng);
+        mes.linear.x = lin_vel_ + abs(lin_vel_*noise(rng)*0);
+        mes.angular.z = ang_vel_+ ang_vel_*noise(rng)*10;
 
         est_vel_pub.publish(mes);
 
