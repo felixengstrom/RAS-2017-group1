@@ -1,0 +1,3 @@
+<launch>
+	<node name="espeak" pkg="ras_espeak" type="espeak_node" output="screen"/>
+</launch>
