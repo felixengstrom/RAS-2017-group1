@@ -5,8 +5,10 @@
   <arg name="y_offset" default="0.2"/>
   <arg name="theta_offset" default="0.0"/>
   <include file="$(find ras_project_lidar)/launch/fakelidar.launch" />
+
+
+  <node pkg="ras_project_localisation" type="robot_transform_node" name="robot_transform_node"/>
   <node pkg="ras_project_localisation" type="localisation_node" name="localisation_node" output="screen">
-  <node pkg="ras_project_localisation" type="robot_transform_node" name="robot_transform_node">
 	 <param name="map_file" value="$(find ras_project_localisation)/map/$(arg map_file)"/>
   </node>
 

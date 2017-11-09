@@ -3,8 +3,8 @@
   <arg name="map_file" default="lab_maze_2017.txt" />
 
   <node pkg="ras_project_localisation" type="localisation_node" name="localisation_node" output="screen">
-  <node pkg="ras_project_localisation" type="robot_transform_node" name="robot_transform_node" output="screen">
  <param name="map_file" value="$(find ras_project_localisation)/map/$(arg map_file)"/>
   </node>
+  <node pkg="ras_project_localisation" type="robot_transform_node" name="robot_transform_node" output="screen"/>
 
 </launch>

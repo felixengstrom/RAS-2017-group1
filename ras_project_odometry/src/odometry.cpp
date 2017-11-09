@@ -54,7 +54,6 @@ void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
     if (current_omega > PI) {
 	current_omega = fmod(current_omega,PI)-PI;
     }
-<<<<<<< HEAD
     if (current_omega < -PI)
 	current_omega = fmod(current_omega,PI)+PI;
     ROS_INFO("x:%f y:%f, omega:%f", current_x, current_y, current_omega);
