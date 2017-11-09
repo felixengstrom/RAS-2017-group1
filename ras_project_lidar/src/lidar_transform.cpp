@@ -49,14 +49,12 @@ int main( int argc, char ** argv)
     tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
-    std::default_random_engine rng;
-    std::normal_distribution<double> dist_noise;
     
-    float zrot=acos(-1);
+    float zrot=acos(-1)*0.97;
     ros::Rate rate(10.0);
     while (n.ok())
     {
-        transform.setOrigin(tf::Vector3(0.0,0.0,0.0));
+        transform.setOrigin(tf::Vector3(0.0,-0.07,0.0));
         q.setRPY(0,0,zrot);
         transform.setRotation(q);
         br.sendTransform(tf::StampedTransform(transform, ros::Time::now(),"robot","laser"));

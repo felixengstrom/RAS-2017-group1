@@ -18,7 +18,7 @@ int main(int argc, char** argv){
 
   ros::NodeHandle node;
   ros::ServiceClient client = node.serviceClient<ras_project_uarm::MoveArmCartesian>("/uarm/moveToPose");
-  ros::Subscriber sub = node.subscribe("object_detection", 1, chatterCallback);
+  ros::Subscriber sub = node.subscribe("/camera/image/object_detected", 1, chatterCallback);
   ras_project_uarm::MoveArmCartesian srv;
   tf::TransformListener listener;
 
@@ -44,7 +44,7 @@ int main(int argc, char** argv){
      uArmObjPos_msg.point.y = transform.getOrigin().y();
      uArmObjPos_msg.point.z = transform.getOrigin().z();
      uArmObjPos_msg.header.frame_id = "uArm_base";
-     uArmObjPos_msg.header.stamp = ros::Time();
+     uArmObjPos_msg.header.stamp = ros::Time::now();
      ROS_INFO("object -----> uArm_base: (%.2f, %.2f, %.2f) at time %.2f",
      uArmObjPos_msg.point.x, uArmObjPos_msg.point.y, uArmObjPos_msg.point.z, uArmObjPos_msg.header.stamp.toSec());
      srv.request.point = uArmObjPos_msg;

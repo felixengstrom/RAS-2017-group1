@@ -10,6 +10,9 @@
 
 double lin_vel_;
 double ang_vel_;
+double alpha_left, beta_left, proportion_left;
+double alpha_right, beta_right, proportion_right;
+
 const static int PI = acos(-1);
 
 class EncoderListener
@@ -17,18 +20,21 @@ class EncoderListener
     private:
         ros::Subscriber left_encoder_sub;
         ros::Subscriber right_encoder_sub;
-
-
+        
     public:
         int last_change_right;
         int last_change_left;
-        ros::Time last_reading_left;
-        ros::Time last_reading_right;
-        double duration_left;
-        double duration_right;
+		unsigned long last_count_left;
+		unsigned long last_count_right;
+        double last_reading_left;
+        double last_reading_right;
+        unsigned long duration_left;
+        unsigned long duration_right;
         EncoderListener( ros::NodeHandle& n_);
         void LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
         void RightEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
+
+
 };
 
 EncoderListener::EncoderListener( ros::NodeHandle& n_ )
@@ -43,23 +49,48 @@ EncoderListener::EncoderListener( ros::NodeHandle& n_ )
                                             this);
     last_change_right = 0;
     last_change_left = 0;
-    last_reading_left;
-    last_reading_right;
+    duration_left = 0;
+    duration_right = 0;
+    last_reading_left = 0;
+    last_reading_right = 0;
+    last_count_right = 0;
+    last_count_left = 0;
 }
 
 void EncoderListener::LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg)
 {
-    last_change_left = msg->count_change;
-    duration_left = (last_reading_left - msg->header.stamp).toSec();
-    last_reading_left = msg->header.stamp;
-    ROS_INFO("encoder sum %i", msg->count );
+    if (last_count_left != 0)
+    	last_change_left += msg->count - last_count_left;
+    else
+	last_change_left += msg->count_change;
+    //duration_left = (last_reading_left - msg->header.stamp).toSec();
+    if (last_reading_left == 0)
+    	duration_left += 100000000;
+    else if (last_reading_left > msg->header.stamp.nsec)
+    	duration_left += (1000000000 - last_reading_left) + msg->header.stamp.nsec;
+    else
+    	duration_left += msg->header.stamp.nsec - last_reading_left;
+    last_reading_left = msg->header.stamp.nsec;
+    last_count_left = msg->count;
+    ROS_INFO("Encoder left sum %i", msg->count );
 }
 
 void EncoderListener::RightEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg)
 {
-    last_change_right = msg->count_change;
-    duration_right = (last_reading_right - msg->header.stamp).toSec();
-    last_reading_right = msg->header.stamp;
+    if (last_count_right != 0)
+	last_change_right += msg->count - last_count_right;
+    else
+    	last_change_right += msg->count_change;
+    //duration_right = (last_reading_right - msg->header.stamp).toSec();
+    if (last_reading_right == 0)
+    	duration_right += 100000000;
+    else if (last_reading_right > msg->header.stamp.nsec)
+    	duration_right += (1000000000 - last_reading_right) + msg->header.stamp.nsec;
+    else
+    	duration_right += msg->header.stamp.nsec - last_reading_right;
+    last_reading_right = msg->header.stamp.nsec;
+    last_count_right = msg->count;
+    ROS_INFO("Encoder right sum %i", msg->count );
 }
 
 void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
@@ -87,47 +118,69 @@ int main (int argc, char **argv)
     
     ros::Rate loop_rate(10);
 
+    ros::NodeHandle nh("~");
+	nh.getParam("alpha_left",alpha_left);
+	nh.getParam("beta_left",beta_left);
+	nh.getParam("alpha_right",alpha_right);
+	nh.getParam("beta_right",beta_right);
+	nh.getParam("beta_right",beta_right);
+	nh.getParam("proportion_left",proportion_left);
+    nh.getParam("proportion_right",proportion_right);
+
     double dt = 0.1;
-    const double control_frequency =100; //10; //still of by about 4
-    const double ticks_per_rev = 3591.84;//900; //3591.84;
+    const double control_frequency = 124; //100; //10; //still of by about 4
+    const double ticks_per_rev_left = 910;//3591.84;//900;
+    const double ticks_per_rev_right = 900;
     const double base_ = 0.238;
     const double wheel_radius_ = 0.036;
 
-    //Controller parameters
     double int_err_left = 0.0;
-    double alpha_left = 7.5;//7.5/5;//12
-    double beta_left = 30.5;//30.0/5;//20
-
     double int_err_right = 0.0;
-    double alpha_right = 7.5;///5;//12
-    double beta_right = 30.0;///5;//20
 
+    
+
+/*
+    //Controller parameters
+    double alpha_left = 2.0;//7.5/5;//12
+    double beta_left = 0.0;//30.5;//30.0/5;//20
+    
+    double alpha_right = 2.0;///5;//12
+    double beta_right = 0.0;//30.0;///5;//20
+    */
     while(ros::ok())
     {
-
+		ROS_INFO("--------------------------------------------------------------");
+		ros::spinOnce();
         // Desired wheels angular velocities
-		
+		if (listener.last_reading_left != 0 && listener.last_reading_right != 0)
+		{
+            ROS_INFO("proportion left : %f", proportion_left);
+    		ROS_INFO("proportion right : %f", proportion_right);
+
             float desired_wl = (lin_vel_ - base_*ang_vel_/2)/wheel_radius_;
             float desired_wr = (lin_vel_ + base_*ang_vel_/2)/wheel_radius_;
-            ROS_INFO("desired left : %f", desired_wl);
-            ROS_INFO("desired right : %f", desired_wr);
+            ROS_INFO("Desired left : %f", desired_wl);
+            ROS_INFO("Desired right : %f", desired_wr);
             // Code for calculating estimated current velocity based on encoders
 
-	        int n=5, i, sum_left=0, sum_right=0;
+	    	//int n=5, i, sum_left=0, sum_right=0;
             int last_change_left = (listener.last_change_left);
             int last_change_right = -(listener.last_change_right);
 
-            ROS_INFO("encoder duration left : %f", listener.duration_left);
-            ROS_INFO("escoder duration right : %f", listener.duration_right);            
+	    double duration_left_sec = (double) listener.duration_left/1000000000;
+	    double duration_right_sec = (double) listener.duration_right/1000000000;
 
-            ROS_INFO("encoder change left : %i", last_change_left);
-            ROS_INFO("escoder change right : %i", last_change_right);
+            ROS_INFO("Encoder duration left : %lf", duration_left_sec);
+            ROS_INFO("Encoder duration right : %lf", (double) duration_right_sec);            
 
-            float est_wl = last_change_left*2*PI*control_frequency/ticks_per_rev;
-            float est_wr = last_change_right*2*PI*control_frequency/ticks_per_rev;
+            ROS_INFO("Encoder change left : %i", last_change_left);
+            ROS_INFO("Encoder change right : %i", last_change_right);
 
-            ROS_INFO("est left : %f", est_wl);
-            ROS_INFO("est right : %f", est_wr);
+            float est_wl = last_change_left*2*PI*(1/duration_left_sec)/ticks_per_rev_left;
+            float est_wr = last_change_right*2*PI*(1/duration_right_sec)/ticks_per_rev_right;
+
+            ROS_INFO("Est left : %f", est_wl);
+            ROS_INFO("Est right : %f", est_wr);
 
             float v = wheel_radius_*(est_wl + est_wr)/2;
             float omega = wheel_radius_*(est_wr-est_wl)/base_;
@@ -135,51 +188,55 @@ int main (int argc, char **argv)
             //ROS_INFO("current omega:%f, current v:%f", omega, v);
 
             //Controller
-        
+
             float error_left = desired_wl - est_wl;
             float error_right = desired_wr - est_wr;
 
-            ROS_INFO("error left : %f", error_left);
-            ROS_INFO("error right : %f", error_right);
+            ROS_INFO("Error left : %f", error_left);
+            ROS_INFO("Error right : %f", error_right);
 
-            int_err_left += error_left*dt;
-            int_err_right += error_right*dt;
+            //int_err_left += error_left*dt;
+            int_err_left += error_left*duration_left_sec;
+            //int_err_right += error_right*dt;
+            int_err_right += error_right*duration_right_sec;
 
-	//set max PWM values 100
-            float pwm_left_float = std:: max(-100.0, (std::min(100.0,(1*desired_wl + alpha_left * error_left + beta_left * int_err_left))));
-            float pwm_right_float =  std::max(-100.0, (std::min(100.0, (1*desired_wr + alpha_right * error_right + beta_right * int_err_right))));
-            if (abs(pwm_left_float)>=100.0)
-	{
-		int_err_left -=error_left*dt;
-	}
-	   if  (abs(pwm_right_float)>=100.0)
-	{
-		int_err_right -=error_right*dt;
-	}
-            ROS_INFO("integral error left: %f", int_err_left);
-	    ROS_INFO("integral error right: %f", int_err_right);
+			//set max PWM values 100
+            float pwm_left_float = std:: max(-100.0, (std::min(100.0, (proportion_left * desired_wl + alpha_left * error_left + beta_left * int_err_left))));
+            float pwm_right_float =  std::max(-100.0, (std::min(100.0, (proportion_right * desired_wr + alpha_right * error_right + beta_right * int_err_right))));
+    		if (abs(pwm_left_float)==100.0)
+			{
+				int_err_left -= error_left*duration_left_sec;
+			}
+			if  (abs(pwm_right_float)==100.0)
+			{
+				int_err_right -= error_right*duration_right_sec;
+			}
+            ROS_INFO("Integral error left: %f", int_err_left);
+	    	ROS_INFO("Integral error right: %f", int_err_right);
 
-            ROS_INFO("estimated v:%f, estimated omega:%f", v, omega);
-            ROS_INFO("wanted v:%f, wanted omega:%f", lin_vel_, ang_vel_);
+            ROS_INFO("Estimated v: %f, Estimated omega: %f", v, omega);
+            ROS_INFO("Wanted v: %f, Wanted omega: %f", lin_vel_, ang_vel_);
 
             //Publishing PWM to left and right motors
             std_msgs::Float32 msg1;
             std_msgs::Float32 msg2;
             
-	    if (lin_vel_ == 0 && ang_vel_ ==0)
-	{
-	    pwm_left_float = 0;
-		msg1.data = pwm_left_float;
-	    pwm_right_float = 0;
-		msg2.data = pwm_right_float;
-	}
-            else 
-	{
-		msg1.data = pwm_left_float;
-           	msg2.data = pwm_right_float;
-	}
-ROS_INFO ("PWM left: %f", pwm_left_float);
-ROS_INFO ("PWM right:%f", pwm_right_float);
+			if (lin_vel_ == 0 && ang_vel_ == 0)
+			{
+			    pwm_left_float = 0;
+				msg1.data = pwm_left_float;
+			    pwm_right_float = 0;
+				msg2.data = pwm_right_float;
+				int_err_left = 0;
+				int_err_right = 0;
+			}
+		    else 
+			{
+				msg1.data = pwm_left_float;
+		        msg2.data = pwm_right_float;
+			}
+			ROS_INFO ("PWM left: %f", pwm_left_float);
+			ROS_INFO ("PWM right: %f", pwm_right_float);
             vel_left_pub.publish(msg1);
             vel_right_pub.publish(msg2);
 
@@ -193,7 +250,11 @@ ROS_INFO ("PWM right:%f", pwm_right_float);
             est_vel_pub.publish(mes);
 
             lin_vel_ = ang_vel_ = 0;
-        ros::spinOnce();
+            listener.last_change_left = 0;
+            listener.last_change_right = 0;
+            listener.duration_left = 0;
+            listener.duration_right = 0;
+        }
         loop_rate.sleep();
     }
     return 0;

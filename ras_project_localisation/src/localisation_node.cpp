@@ -36,7 +36,7 @@ class ParticleFilter
         double lidar_displ_omega;
         
     public:
-        
+      
         tf::TransformListener listener;
         geometry_msgs::PoseStamped lastPose;
         sensor_msgs::LaserScan latest_scan;
@@ -68,7 +68,7 @@ ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
         listener.waitForTransform("robot","laser",ros::Time(0), ros::Duration(2));
         listener.lookupTransform("robot","laser",ros::Time(0), transform);
     } catch(tf::TransformException &ex)
-    {
+   {
         ROS_INFO("particle update failed");
     }
     lidar_displ_x = transform.getOrigin().x();
@@ -223,7 +223,7 @@ void ParticleFilter::update_particles_weight()
     int nAngles = laser_values.size();
 
     std::vector<int> inds;
-    float var = 2;
+    float var = 1;
     double angle_increment = 2*PI/nAngles;
 
     //find values that are not infinate in the laser.
@@ -271,16 +271,18 @@ std::vector<float> ParticleFilter::rayTrace(const geometry_msgs::Point32 &pos, f
     for(int a = 0; a<n_angles; a++)
     {
         int n_walls = map.size();
-        float angle_n = angle + angles[a] + lidar_displ_omega;
+        float angle_n = angle + angles[a] + lidar_displ_omega + PI;
+        float x_disp = lidar_displ_x*cos(angle) - lidar_displ_y*sin(angle);
+        float y_disp = lidar_displ_y*cos(angle) + lidar_displ_x*sin(angle);
         float ca = cos(angle_n);
         float sa = sin(angle_n);
         dists[a] = 10;
         for(int w = 0; w<n_walls; w++)
         {
-            float x1 = map[w].x1 - pos.x + lidar_displ_x,
-                  x2 = map[w].x2 - pos.x + lidar_displ_x,
-                  y1 = map[w].y1 - pos.y + lidar_displ_y,
-                  y2 = map[w].y2 - pos.y + lidar_displ_y;
+            float x1 = map[w].x1 - pos.x - x_disp,
+                  x2 = map[w].x2 - pos.x - x_disp,
+                  y1 = map[w].y1 - pos.y - y_disp,
+                  y2 = map[w].y2 - pos.y - y_disp;
 
             float x1_new = x1*ca + y1*sa,
                   x2_new = x2*ca + y2*sa,
