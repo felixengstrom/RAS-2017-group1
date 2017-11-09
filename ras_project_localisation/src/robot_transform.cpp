@@ -32,7 +32,6 @@ void RobotBroadcaster::robotPoseCallback(const geometry_msgs::PoseStamped::Const
     tf::Quaternion q;
     tf::quaternionMsgToTF(msg->pose.orientation, q);
     ROS_INFO("in callback");
-
     transform.setOrigin(tf::Vector3(x,y,0.0));
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform,ros::Time::now(),"map","robot"));
@@ -40,7 +39,7 @@ void RobotBroadcaster::robotPoseCallback(const geometry_msgs::PoseStamped::Const
 
 int main( int argc, char ** argv)
 {
-    ros::init(argc,argv,"lidar_broadcaster");
+    ros::init(argc,argv,"robot_transform_broadcaster");
     ros::NodeHandle n;
     RobotBroadcaster rb(n);
     ros::spin();

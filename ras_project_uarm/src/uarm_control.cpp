@@ -64,11 +64,11 @@ UarmController::UarmController() : tf_()
     n_.getParam("j3_start", j3_start);
 
     
-    d0 = 0.09;
+    d0 = 0.1;
     d1 = 0.02;
     d2 = 0.15;
     d3 = 0.16;
-    d4 = 0.033;
+    d4 = 0.035;
     d5 = 0.06;
 
     n_.getParam("d0", d0);
