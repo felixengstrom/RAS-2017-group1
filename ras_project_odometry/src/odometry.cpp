@@ -10,7 +10,7 @@ class OdometryNode
 {
     private:
         ros::NodeHandle n_;
-        ros::Publisher odom_pub; 
+        //ros::Publisher odom_pub; 
         ros::Subscriber sub;
         tf::Transform transform;
         tf::TransformBroadcaster br;
@@ -27,7 +27,7 @@ class OdometryNode
             current_omega = PI/2;
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
-	    odom_pub = n_.advertise<geometry_msgs::Pose2D>("robot/pose", 1000);
+	    //odom_pub = n_.advertise<geometry_msgs::Pose2D>("robot/pose", 1000);
         }
         void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
 };
@@ -49,11 +49,11 @@ void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
     pose.x = current_x;
     pose.y = current_y;
     pose.theta = current_omega;
-    odom_pub.publish(pose);
+    //odom_pub.publish(pose);
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "robot"));
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "odom"));
 }
 
 int main(int argc, char ** argv){

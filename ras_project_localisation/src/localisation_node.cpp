@@ -33,6 +33,7 @@ class ParticleFilter
         ros::Publisher location_pub;
         double lidar_displ_x;
         double lidar_displ_y;
+        double lidar_displ_omega;
         
     public:
         
@@ -70,9 +71,10 @@ ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
     {
         ROS_INFO("particle update failed");
     }
-    ROS_INFO("x : %f, y : %f", lidar_displ_x, lidar_displ_y);
     lidar_displ_x = transform.getOrigin().x();
     lidar_displ_y = transform.getOrigin().y();
+    lidar_displ_omega = tf::getYaw(transform.getRotation());
+    ROS_INFO("lidar displasement in relation to robot: x : %f, y : %f, omega : %f", lidar_displ_x, lidar_displ_y,lidar_displ_omega);
     lastPose = initialPose;
     initiateParticles(nParticles);
    /// location_pub  = n.advertise("location"
@@ -164,8 +166,8 @@ void ParticleFilter::update_particles_position()
     ros::Time t = ros::Time::now();
     tf::StampedTransform transform;
     try{
-        listener.waitForTransform("robot",lastPose.header.stamp,"robot",t ,"map",ros::Duration(1));
-        listener.lookupTransform("robot",lastPose.header.stamp,"robot",t ,"map", transform);
+        listener.waitForTransform("odom",lastPose.header.stamp,"odom",t ,"map",ros::Duration(1));
+        listener.lookupTransform("odom",lastPose.header.stamp,"odom",t ,"map", transform);
     } catch(tf::TransformException &ex)
     {
         ROS_INFO("particle update failed");
@@ -269,16 +271,16 @@ std::vector<float> ParticleFilter::rayTrace(const geometry_msgs::Point32 &pos, f
     for(int a = 0; a<n_angles; a++)
     {
         int n_walls = map.size();
-        float angle_n = angle + angles[a] + PI;
+        float angle_n = angle + angles[a] + lidar_displ_omega;
         float ca = cos(angle_n);
         float sa = sin(angle_n);
         dists[a] = 10;
         for(int w = 0; w<n_walls; w++)
         {
-            float x1 = map[w].x1 - pos.x,
-                  x2 = map[w].x2 - pos.x,
-                  y1 = map[w].y1 - pos.y,
-                  y2 = map[w].y2 - pos.y;
+            float x1 = map[w].x1 - pos.x + lidar_displ_x,
+                  x2 = map[w].x2 - pos.x + lidar_displ_x,
+                  y1 = map[w].y1 - pos.y + lidar_displ_y,
+                  y2 = map[w].y2 - pos.y + lidar_displ_y;
 
             float x1_new = x1*ca + y1*sa,
                   x2_new = x2*ca + y2*sa,
@@ -357,7 +359,7 @@ int main(int argc, char*argv[])
     ros::Rate rate(10);
     ros::NodeHandle n;
     ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
-    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("truepose", 10);
+    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("robot/pose", 10);
 
     geometry_msgs::PoseStamped pp;
     std_msgs::Header h;

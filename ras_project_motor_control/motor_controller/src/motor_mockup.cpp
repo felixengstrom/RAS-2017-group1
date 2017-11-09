@@ -49,7 +49,7 @@ int main (int argc, char **argv)
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "robot"));
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "odom"));
     ros::Time last  = ros::Time::now();
 
     ros::Rate rate(10);

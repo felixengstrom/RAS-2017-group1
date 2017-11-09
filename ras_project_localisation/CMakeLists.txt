@@ -29,7 +29,10 @@ catkin_package(
 
 
 add_executable(localisation_node src/localisation_node.cpp)
-#add_dependencies(localisation_node ras_project_uarm_generate_messages_cpp)
 target_link_libraries(localisation_node
+  ${catkin_LIBRARIES}
+)
+add_executable(robot_transform_node src/robot_transform.cpp)
+target_link_libraries(robot_transform_node
   ${catkin_LIBRARIES}
 )
