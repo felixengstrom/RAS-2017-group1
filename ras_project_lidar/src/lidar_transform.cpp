@@ -49,6 +49,8 @@ int main( int argc, char ** argv)
     tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
+    std::default_random_engine rng;
+    std::normal_distribution<double> dist_noise;
     
     float zrot=acos(-1);
     ros::Rate rate(10.0);

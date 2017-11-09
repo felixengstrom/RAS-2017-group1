@@ -11,7 +11,7 @@ class OdometryNode
 {
     private:
         ros::NodeHandle n_;
-        ros::Publisher odom_pub; 
+        //ros::Publisher odom_pub; 
         ros::Subscriber sub;
         ros::Subscriber imu;
         tf::Transform transform;
@@ -29,18 +29,17 @@ class OdometryNode
         {
             time = ros::Time::now();
             current_x = current_y = 0;
-	    current_omega = PI/2;
+	        current_omega = PI/2;
             imu_x = imu_y = imu_omega = 0;
-	    offset_x = offset_y = 0;
+	        offset_x = offset_y = 0;
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
             imu = n_.subscribe("imu/data", 10, &OdometryNode::IMUCallback, this);
-	    odom_pub = n_.advertise<geometry_msgs::PoseStamped>("robot/pose", 1000);
+	    //odom_pub = n_.advertise<geometry_msgs::PoseStamped>("robot/pose", 1000);
         }
         void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
         void IMUCallback(const sensor_msgs::Imu::ConstPtr& msg);
 };
-
 
 void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
 {
@@ -55,19 +54,21 @@ void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
     if (current_omega > PI) {
 	current_omega = fmod(current_omega,PI)-PI;
     }
+<<<<<<< HEAD
     if (current_omega < -PI)
 	current_omega = fmod(current_omega,PI)+PI;
     ROS_INFO("x:%f y:%f, omega:%f", current_x, current_y, current_omega);
-    geometry_msgs::PoseStamped pose;
-    pose.pose.position.x = current_x;
-    pose.pose.position.y = current_y;
-    pose.pose.orientation.w = cos(0.5*current_omega);
-    pose.pose.orientation.z = sin(0.5*current_omega);
-    odom_pub.publish(pose);
+    //geometry_msgs::PoseStamped pose;
+    //pose.pose.position.x = current_x;
+    //pose.pose.position.y = current_y;
+    //pose.pose.orientation.w = cos(0.5*current_omega);
+    //pose.pose.orientation.z = sin(0.5*current_omega);
+    //odom_pub.publish(pose);
+
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "robot"));
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "odom"));
 }
 
 void OdometryNode::IMUCallback(const sensor_msgs::Imu::ConstPtr& msg)
