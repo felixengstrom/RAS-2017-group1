@@ -18,7 +18,7 @@ find_package(catkin REQUIRED
             sensor_msgs
             message_filters
             laser_geometry
-            Eigen REQUIRED
+            #Eigen REQUIRED
             )
 
 ## System dependencies are found with CMake's conventions
