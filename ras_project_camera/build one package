@@ -1,0 +1,49 @@
+
+rosbag record /topic/
+
+Here is the thing: if you know the coordinates of the object in the
+image, the coordinates are the same in the organized point cloud
+beneath, so you can get their respective X, Y and Z coordinates from the
+points. say you have a pixel at (2,3) another one in (7,8), all you have
+to do is pcl::PointXYZ p1 = cloud (2,3); pcl::PointXYZ p2 = cloud (7,8);
+
+then the x, y and z can be obtained respectively doing p1.x, p1.y, p1.z
+same goes for p2.
+
+Thus you obtain 3D coordinates of the object in camera frame.
+
+To get the object in world coordinates you still need the camera
+position in the the world reference. If you assume the camera is the
+origin of the world then you are done.
+
+
+cloud(right_eye.x,right_eye.y).x
+cloud(right_eye.x,right_eye.y).y
+cloud(right_eye.x,right_eye.y).z
+
+pcl::PointCloud<pcl::PointXYZ> cloud
+
+
+void cloud_cb(const sensor_msgs::PointCloud2 cloud)
+{
+int pcl_index, rgb_h, rgb_w;
+rgb_h = 240;
+rgb_w = 320;
+pcl_index = (h*480) + rgb_w; // result is 115520
+pcl::PointCloud<pcl::pointxyz> point_pcl;
+pcl::fromROSMsg(cloud,point_pcl);
+std::cout << "(x,y,z) = " << point_pcl.at(pcl_index) << std::endl;
+}
+
+
+pcl::PointCloud<pcl::PointXYZRGB> m_cloud = createPointCloud(nodeList);
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_ptrCloud(&m_cloud);
+
+
+bool NeedsRef(const PointCloud<PointXYZRGB>& cloud);
+void NeedsPtr(PointCloud<PointXYZRGB>::Ptr cloud);
+
+bool DoSomething(PointCloud<PointXYZRGB>::Ptr cloud) {
+  NeedsRef(*cloud);
+  NeedsPtr(cloud);
+}
