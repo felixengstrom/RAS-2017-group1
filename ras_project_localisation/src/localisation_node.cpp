@@ -142,7 +142,7 @@ void ParticleFilter::resample_particles()
     {
         double uni = rand()*sum/RAND_MAX;  
         int ind = cumulative.upper_bound(uni)->second;
-        //std::cout << uni<< " " << ind << "\n";
+        //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
         newPs[i].x += vel_noise(rng)*0.1;
         newPs[i].y += vel_noise(rng)*0.1;
@@ -158,6 +158,10 @@ void ParticleFilter::scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
     hasScan = true;
     latest_scan = sensor_msgs::LaserScan(*msg);
+    if (hasScan){
+        update_particles_weight();
+        resample_particles();
+    }
 }
 
 void ParticleFilter::update_particles_position()
@@ -178,7 +182,7 @@ void ParticleFilter::update_particles_position()
     {
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
-        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)) + ang_noise(rng);
+        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)) + ang_noise(rng)*0.4;
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
@@ -189,10 +193,6 @@ void ParticleFilter::update_particles_position()
 
     lastPose.header.stamp = t;
 
-    if (hasScan){
-        update_particles_weight();
-        resample_particles();
-    }
 
     double mean_x = 0;
     double mean_y = 0;
@@ -257,7 +257,7 @@ void ParticleFilter::update_particles_weight()
         float weight = 0;
         for (int j=0; j<nScans; j++)
         {
-            weight += -pow((rays[j] - dists[j])/var, 2.0) - log(var*0.1);
+            weight += -pow((rays[j] - dists[j])/var, 2.0);
         }
 
         particles.channels[i].values[1] = weight;
@@ -358,7 +358,6 @@ int main(int argc, char*argv[])
 
     
 
-    ros::Rate rate(10);
     ros::NodeHandle n;
     ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
     ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("robot/pose", 10);
@@ -378,10 +377,17 @@ int main(int argc, char*argv[])
     q.z = sin(alpha/2);
     pp.pose.orientation = q;
     
-    ParticleFilter pf(pp, 1000,160, map);   
+    ParticleFilter pf(pp, 1000,40, map);   
+
+    ros::Rate rate(100);
     while (ros::ok()){
         parts.publish(pf.particles);
+        //try{
         pf.update_particles_position();
+        //} catch (std::Exception &e){
+            //ROS_INFO(e.what());
+        
+        //}
         truepose.publish(pf.lastPose); 
         ros::spinOnce();
         rate.sleep();
