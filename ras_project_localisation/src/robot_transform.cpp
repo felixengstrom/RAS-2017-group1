@@ -31,7 +31,6 @@ void RobotBroadcaster::robotPoseCallback(const geometry_msgs::PoseStamped::Const
     double y = msg->pose.position.y;
     tf::Quaternion q;
     tf::quaternionMsgToTF(msg->pose.orientation, q);
-    ROS_INFO("in callback");
     transform.setOrigin(tf::Vector3(x,y,0.0));
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform,ros::Time::now(),"map","robot"));

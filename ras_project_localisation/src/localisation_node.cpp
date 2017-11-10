@@ -16,7 +16,6 @@ struct Line{
     float y1;
     float y2;
 };
-
 class ParticleFilter
 {
     private:
@@ -54,6 +53,8 @@ class ParticleFilter
         void resample_particles();
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
 };
+
+bool myfunction (int i,int j) { return (i>j); }
 
 ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
                                int _nParticles,
@@ -144,8 +145,8 @@ void ParticleFilter::resample_particles()
         int ind = cumulative.upper_bound(uni)->second;
         //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
-        newPs[i].x += vel_noise(rng)*0.1;
-        newPs[i].y += vel_noise(rng)*0.1;
+        newPs[i].x += vel_noise(rng)*1.0;
+        newPs[i].y += vel_noise(rng)*1.0;
         newCh[i] = particles.channels[ind];
         newCh[i].values[0] += vel_noise(rng)*0.1;
     }
@@ -158,10 +159,6 @@ void ParticleFilter::scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
     hasScan = true;
     latest_scan = sensor_msgs::LaserScan(*msg);
-    if (hasScan){
-        update_particles_weight();
-        resample_particles();
-    }
 }
 
 void ParticleFilter::update_particles_position()
@@ -223,30 +220,30 @@ void ParticleFilter::update_particles_weight()
     int nAngles = laser_values.size();
 
     std::vector<int> inds;
-    float var = 1;
+    float var = 0.5;
     double angle_increment = 2*PI/nAngles;
 
     //find values that are not infinate in the laser.
     for(int ind = 0; ind<nAngles;ind++)
     {
-        if (laser_values[ind]<10) //should really check if value not == inf, but who cares?                           
+        if (laser_values[ind]<3) //should really check if value not == inf, but who cares?                           
             //  We should not have values larger than 10 either
 
         {
             inds.push_back(ind);
         }
     }
-    nScans = inds.size();
+    int toScan = std::min(nScans, (int)inds.size());
    
 
     for (int i=0; i<nParticles;i++){
         geometry_msgs::Point32 p = particles.points[i];
         float angle = particles.channels[i].values[0];
-        std::vector<float> angles(nScans);
-        std::vector<float> dists(nScans);
+        std::vector<float> angles(toScan);
+        std::vector<float> dists(toScan);
         std::shuffle(inds.begin(), inds.end(), rng);
 
-        for (int j=0; j<nScans; j++)
+        for (int j=0; j<toScan; j++)
         {
             angles[j]=inds[j]*angle_increment;
             dists[j] = laser_values[inds[j]];
@@ -255,9 +252,15 @@ void ParticleFilter::update_particles_weight()
         std::vector<float> rays = rayTrace(p, angle, angles);
 
         float weight = 0;
-        for (int j=0; j<nScans; j++)
+        std::vector<float> weights(toScan);
+        for (int j=0; j<toScan; j++)
         {
-            weight += -pow((rays[j] - dists[j])/var, 2.0);
+            weights[j] = -pow((rays[j] - dists[j]), 2.0)/var;
+        }
+        std::sort(weights.begin(), weights.end(), myfunction);
+        for (int j=0; j<toScan - int(toScan/4); j++)
+        {
+            weight += weights[j];
         }
 
         particles.channels[i].values[1] = weight;
@@ -381,16 +384,14 @@ int main(int argc, char*argv[])
 
     ros::Rate rate(100);
     while (ros::ok()){
-        parts.publish(pf.particles);
-        //try{
         pf.update_particles_position();
-        //} catch (std::Exception &e){
-            //ROS_INFO(e.what());
-        
-        //}
+        if (pf.hasScan){
+            pf.update_particles_weight();
+            pf.resample_particles();
+        }
+        parts.publish(pf.particles);
         truepose.publish(pf.lastPose); 
         ros::spinOnce();
         rate.sleep();
-        tf::StampedTransform transform;
     }
 }
