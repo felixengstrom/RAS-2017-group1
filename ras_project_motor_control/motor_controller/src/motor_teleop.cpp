@@ -28,7 +28,7 @@ private:
 TeleopTurtle::TeleopTurtle():
   linear_(0),
   angular_(0),
-  l_scale_(0.05),
+  l_scale_(0.1),
   a_scale_(0.5)
 {
   nh_.param("scale_angular", a_scale_, a_scale_);
@@ -85,7 +85,6 @@ void TeleopTurtle::keyLoop()
       exit(-1);
     }
 
-    linear_=angular_=0;
     ROS_DEBUG("value: 0x%02X\n", c);
   
     switch(c)
@@ -110,13 +109,19 @@ void TeleopTurtle::keyLoop()
         linear_ = -1.0;
         dirty = true;
         break;
+      case ' ':
+        ROS_DEBUG("DOWN");
+        linear_ = 0.0;
+        angular_ = 0.0;
+        dirty = true;
+        break;
     }
    
 
     geometry_msgs::Twist twist;
     twist.angular.z = a_scale_*angular_;
     twist.linear.x = l_scale_*linear_;
-    if(dirty ==true)
+    if(true)
     {
       twist_pub_.publish(twist);    
       dirty=false;

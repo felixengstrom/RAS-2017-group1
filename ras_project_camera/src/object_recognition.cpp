@@ -2,10 +2,6 @@
 #include <sensor_msgs/Image.h>
 #include <stdlib.h>
 
-void imageCallback(const sensor_msgs::Image::ConstPtr& msg)
-{
-}
-
 int main( int argc, char** argv)
 {
     ros::init(argc, argv, "object_recognition");

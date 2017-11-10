@@ -8,7 +8,7 @@
 #include "ras_project_uarm/MoveArmCartesian.h"
 
 static const double PI = acos(-1);
-static const double ROBOT_RADIUS = 0.22;
+static const double ROBOT_RADIUS = 0.20;
 static const double ROBOT_HEIGHT = 0.05;
 
 struct AngleSetting{
@@ -64,11 +64,11 @@ UarmController::UarmController() : tf_()
     n_.getParam("j3_start", j3_start);
 
     
-    d0 = 0.09;
+    d0 = 0.1;
     d1 = 0.02;
     d2 = 0.15;
     d3 = 0.16;
-    d4 = 0.033;
+    d4 = 0.035;
     d5 = 0.06;
 
     n_.getParam("d0", d0);
@@ -120,7 +120,7 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
                         ras_project_uarm::MoveArmCartesian::Response &res)
 {
     bool success = false;
-    geometry_msgs::PointStamped point_robot_frame;
+    /*geometry_msgs::PointStamped point_robot_frame;
 
     try
     {
@@ -131,11 +131,11 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
         ROS_INFO("Could not get transformation to perform moveToPointCallback");
         res.error = not(success);
         return success;
-    }
+    }*/
 
-    float x = point_robot_frame.point.x;
-    float y = point_robot_frame.point.y;
-    float z = point_robot_frame.point.z;
+    float x = req.point.point.x;
+    float y = req.point.point.y;
+    float z = req.point.point.z;
 
     ROS_INFO("x:%f, y:%f, z:%f", x, y, z);
     
