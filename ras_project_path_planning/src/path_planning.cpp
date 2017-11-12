@@ -27,8 +27,6 @@ struct point {
 bool cmp(const std::pair<int,point>& s1, const std::pair<int,point>& s2)
 { return s1.second.f  < s2.second.f ; }
 
-double heuristic(const point& p1, const point& p2)
-{return (double)sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2)); }
 
 
 class PathPlanning
@@ -62,8 +60,11 @@ class PathPlanning
 		double x_start, y_start,x_goal,y_goal;
 		//Path Smoothing
 		std::vector<int> path_list;
+		//A* Heuristic wall avoiding value
+		int Wall_step;
+		double Wall_cost;
 	public:
-		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1)
+		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(1), Wall_cost(10)
 		{
 		n = ros::NodeHandle();
 		t_update=ros::Time::now();
@@ -75,6 +76,7 @@ class PathPlanning
 		Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 		Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
 		}
+   		double  heuristic(const point& p1, const point& p2);
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 		{x_start=msg->pose.position.x; y_start = msg-> pose.position.y; return; }
 		void GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
@@ -85,6 +87,29 @@ class PathPlanning
 		void loop_function();
 };
 
+
+double PathPlanning::heuristic(const point& p1, const point& p2)
+{
+	int upper_limit = width_height*width_height;
+	int index_now=p1.x+p1.y*width_height;
+	int checkval;
+	double wall_weight;
+	wall_weight=0;
+	for(int i=-1*Wall_step; i<=Wall_step;i++)
+	{
+		for(int j=-1*Wall_step; j <= Wall_step; j++)
+		{
+		checkval= index_now + i + j*width_height;
+		if(checkval > upper_limit || checkval < 0){continue;}
+		if(Csp[checkval]!=0)
+			{
+			return (double)(Wall_cost+sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2))); 
+			}
+
+		}
+
+	}
+	return (double)sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2)); }
 void PathPlanning::loop_function()
 {
 
