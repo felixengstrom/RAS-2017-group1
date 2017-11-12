@@ -39,6 +39,7 @@ class PathPlanning
 		ros::Subscriber OG_sub; //subscribe to Occupany Grid, Create C-space
 		 //get current position from Localization
 		ros::Subscriber goal_sub; //get goal position
+		ros::Subscriber curr_sub;
 		ros::Publisher C_pub;
 		ros::Publisher Path_pub; // publish set of points for rviz
 		ros::Publisher Path_follower_pub; //publish for pathfollower
@@ -46,6 +47,8 @@ class PathPlanning
 		//for updating only when dif
 		ros::Time t_update; // For OG callback
 		ros::Time goal_update; // for Goal Callback
+		ros::Time gNow;
+		ros::Time tNow;
 		//map variables
 		float res;
 		int width_height;
@@ -60,40 +63,37 @@ class PathPlanning
 		//Path Smoothing
 		std::vector<int> path_list;
 	public:
-		PathPlanning(): Csp(250*250), listener()
+		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1)
 		{
 		n = ros::NodeHandle();
 		t_update=ros::Time::now();
 		goal_update=ros::Time::now();
+		curr_sub = n.subscribe("/robot/pose",10,&PathPlanning::CurrCallback,this);
 		OG_sub = n.subscribe("/maze_OccupancyGrid",10,&PathPlanning::OGCallback,this);
 		goal_sub= n.subscribe("/robot/goal",10,&PathPlanning::GoalCallback,this);
 		C_pub  = n.advertise<nav_msgs::OccupancyGrid>("maze_CSpace",1000);
 		Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 		Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
 		}
+		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+		{x_start=msg->pose.position.x; y_start = msg-> pose.position.y; return; }
 		void GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 		void OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg); // Creates C-space Csp
 		void Path(double x0, double y0, double x1,double y1); // A* evaluates path
 		void Reconstruct_path(int curr_index); //Reconstruct path from Path() WITH SMOOTHING
 		bool Checkline(int start, int goal); //used in Reconstruct_path, check if line between two points [start,goal] is empty
+		void loop_function();
 };
-void PathPlanning::GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
-{
-	ros::Time now=msg->header.stamp;
-	if(goal_update!=now)
-	{
-	tf::StampedTransform transform;
-	listener.lookupTransform("/map","/robot",ros::Time(0),transform);
-	x_start=transform.getOrigin().x();
-	y_start=transform.getOrigin().y();
 
-	x_goal=msg->pose.position.x;
-	y_goal=msg->pose.position.y;
+void PathPlanning::loop_function()
+{
+
+if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
+	if(path_list.size()==0){
 	Path(x_start,y_start,x_goal,y_goal);
 	}
 
-
-
+	if(path_list.size()>0){
 	ROS_INFO_STREAM("following smoothed path points were calculated (size of vector:  "<<path_list.size() << " ) ");
 	double Q0,W0,Q1,W1;
 	Q0=(path_list[0]%width_height)*res;
@@ -137,14 +137,83 @@ void PathPlanning::GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 	}
 	Path_pub.publish(wall_marker);
 	Path_follower_pub.publish(following_points);
+	}
+}
+}
+void PathPlanning::GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+{
+	gNow=msg->header.stamp;
+	if(goal_update!=gNow)
+	{
+		goal_update=gNow;
+	//tf::StampedTransform transform;
+	//listener.lookupTransform("/robot","/map",ros::Time(0),transform);
+	//x_start=transform.getOrigin().x();
+	//y_start=transform.getOrigin().y();
+
+	x_goal=msg->pose.position.x;
+	y_goal=msg->pose.position.y;
+	path_list.clear(); // New goal, reset path list computed
+	ROS_INFO_STREAM("New Goal Recieved! goal x : "<< x_goal << " goal y : " << y_goal << " path_list.size : " << path_list.size());
+//	Path(x_start,y_start,x_goal,y_goal);
+	}
+
+
+//
+//	ROS_INFO_STREAM("following smoothed path points were calculated (size of vector:  "<<path_list.size() << " ) ");
+//if(path_list.size()>0){
+//	double Q0,W0,Q1,W1;
+//	Q0=(path_list[0]%width_height)*res;
+//	W0=(path_list[0]/width_height)*res;
+//	//PoseArray
+//	geometry_msgs::PoseArray following_points;
+//	geometry_msgs::Pose arp;
+//	arp.position.x=Q0; arp.position.y=W0;
+//	following_points.poses.push_back(arp);
+//
+//
+//	//wall_marker is for rviz
+//	visualization_msgs::Marker wall_marker;
+//	wall_marker.header.frame_id = "/map";
+//	wall_marker.header.stamp = ros::Time();
+//	wall_marker.ns = "world";
+//	wall_marker.type = visualization_msgs::Marker::LINE_STRIP;
+//	wall_marker.action = visualization_msgs::Marker::ADD;
+//	wall_marker.scale.x = 0.01;
+//	wall_marker.color.a = 1.0;
+//	wall_marker.color.r = (0.0/255.0);
+//	wall_marker.color.g = (255.0/255.0);
+//	wall_marker.color.b = (0.0/255.0);
+//	wall_marker.pose.position.z = 0;
+//	wall_marker.pose.position.x = 0;
+//	wall_marker.pose.position.y = 0;
+//	geometry_msgs::Point pnt;
+//	pnt.x=Q0; pnt.y=W0;
+//	wall_marker.points.push_back(pnt);
+//	ROS_INFO_STREAM("I got HERE!");
+//	for(int i=1;i<path_list.size();i++)
+//	{
+//	
+//		Q1=(path_list[i]%width_height)*res;
+//		W1=(path_list[i]/width_height)*res;
+//		pnt.x=Q1;pnt.y=W1;
+//		wall_marker.points.push_back(pnt);
+//		ROS_INFO_STREAM(" x = " << Q1 << " y = " << W1);
+//
+//		arp.position.x=Q1; arp.position.y=W1;
+//		following_points.poses.push_back(arp);
+//	}
+//	Path_pub.publish(wall_marker);
+//	Path_follower_pub.publish(following_points); 
+
 }
 void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
 	
-	ros::Time now= msg->info.map_load_time;
-	if(now != t_update)
+	 tNow= msg->info.map_load_time;
+	if(tNow != t_update)
 	{
-	t_update=now;
+	t_update=tNow;
 	std::vector<int8_t>OG=msg->data;
 	res=msg->info.resolution;
 	width_height=msg->info.width;
@@ -213,8 +282,8 @@ double rt2 = sqrt(2);
 int x_cell = (int)(x1/res);
 int y_cell = (int)(y1/res);
 
-int x_start = (int)(x0/res);
-int y_start = (int)(y0/res);
+int x_Start = (int)(x0/res);
+int y_Start = (int)(y0/res);
 if(Csp[x_cell+y_cell*width_height]!=0)
 {
 	ROS_INFO_STREAM("thats a wall");
@@ -233,8 +302,8 @@ goalpos.x = x_cell;
 goalpos.y = y_cell;
 //start pos
 point startpos; 
-startpos.x=x_start; 
-startpos.y=y_start;
+startpos.x=x_Start; 
+startpos.y=y_Start;
 startpos.g=0;
 startpos.f=startpos.g+heuristic(startpos,goalpos);
 int tmp1=startpos.x+width_height*startpos.y;
@@ -444,6 +513,14 @@ int main(int argc, char **argv)
 
 	ros::init(argc,argv,"path_planner");
 	PathPlanning P;
-	ros::spin();	
+	ros::Rate r(10);
+	while(ros::ok())
+	{
+		P.loop_function();
+		ros::spinOnce();
+		r.sleep();
+	}
+
+	//ros::spin();	
 	return 0;
 }
