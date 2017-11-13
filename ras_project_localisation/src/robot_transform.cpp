@@ -74,7 +74,6 @@ void RobotBroadcaster::publishCurrentPose()
 void RobotBroadcaster::robotPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
     lastPose = *msg;
-    ROS_INFO("callback");
 }
 
 int main( int argc, char ** argv)

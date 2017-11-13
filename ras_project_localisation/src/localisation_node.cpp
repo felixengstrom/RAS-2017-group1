@@ -38,6 +38,7 @@ class ParticleFilter
     public:
       
         tf::TransformListener listener;
+        void update_lastPose();
         geometry_msgs::PoseStamped lastPose;
         sensor_msgs::LaserScan latest_scan;
         bool hasScan;
@@ -56,33 +57,6 @@ class ParticleFilter
 };
 
 bool myfunction (int i,int j) { return (i>j); }
-//geometry_msgs::PoseStamped ParticleFilter::getCurrentPose()
-//{
-//    geometry_msgs::PoseStamped currentPose(lastPose);
-//
-//    tf::StampedTransform transform;
-//    ros::Time t  = ros::Time::now();
-//    try{
-//        listener.waitForTransform("odom",lastPose.header.stamp,"odom",t ,"map",ros::Duration(1));
-//        listener.lookupTransform("odom",lastPose.header.stamp,"odom",t ,"map", transform);
-//    } catch(tf::TransformException &ex)
-//    {
-//        ROS_INFO("particle update failed");
-//        std::cout << ex.what() << "\n";
-//    }
-//    double currentAng = atan2(lastPose.pose.orientation.z, lastPose.pose.orientation.w)*2;
-//    ROS_INFO("%f", currentAng);
-//    currentPose.pose.position.x += cos(currentAng)*transform.getOrigin().x()
-//                                  -sin(currentAng)*transform.getOrigin().y();
-//    currentPose.pose.position.y += cos(currentAng)*transform.getOrigin().y()
-//                                 +sin(currentAng)*transform.getOrigin().x();
-//    double changeAng = tf::getYaw(transform.getRotation());
-//    ROS_INFO("%f", changeAng);
-//    currentPose.pose.orientation.w = cos((currentAng + changeAng )*0.5);
-//    currentPose.pose.orientation.z = sin((currentAng + changeAng )*0.5);
-//    currentPose.header.stamp = t;
-//    return currentPose;
-//}
 
 ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
                                int _nParticles,
@@ -225,10 +199,10 @@ void ParticleFilter::update_particles_position(ros::Time t)
         particles.points[i].x += cos(omega_n)*vt + vt*(float)vel_noise(rng)*cos(omega_n);
         particles.points[i].y += sin(omega_n)*vt + vt*(float)vel_noise(rng)*sin(omega_n);
     }
+}
 
-    lastPose.header.stamp = t;
-
-
+void ParticleFilter::update_lastPose()
+{
     double mean_x = 0;
     double mean_y = 0;
     double sum_sin = 0;
@@ -245,7 +219,7 @@ void ParticleFilter::update_particles_position(ros::Time t)
     mean_y = mean_y/nParticles;
     double mean_omega = atan2(sum_sin, sum_cos);
 
-    lastPose.header.stamp = t;
+    lastPose.header.stamp = latest_scan.header.stamp;
     lastPose.pose.position.x= mean_x;
     lastPose.pose.position.y= mean_y;
     lastPose.pose.orientation.w = cos(mean_omega*0.5);
@@ -418,7 +392,7 @@ int main(int argc, char*argv[])
     q.z = sin(alpha/2);
     pp.pose.orientation = q;
     
-    ParticleFilter pf(pp, 1000,40, map);   
+    ParticleFilter pf(pp, 1000,16, map);   
 
     ros::Rate rate(100);
     while (ros::ok()){
@@ -426,6 +400,7 @@ int main(int argc, char*argv[])
             pf.update_particles_weight();
             pf.resample_particles();
         }
+        pf.update_lastPose();
         parts.publish(pf.particles);
         truepose.publish(pf.lastPose); 
         ros::spinOnce();
