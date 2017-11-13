@@ -1,0 +1,12 @@
+<launch>
+
+	<arg name="map_file" default="lab_maze_2017.txt"/>
+	<include file="$(find ras_project_localisation)/launch/localisation_simulation.launch" />
+	<node pkg="ras_project_path_planning" type="OccupancyGrid_node" name="OccupancyGrid_node">
+		<param name="map_file" value="$(find ras_project_localisation)/map/$(arg map_file)" />
+	</node>
+	<node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node"/>
+
+	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
+	<node pkg="rviz" type="rviz" name="rviz" />
+</launch>
