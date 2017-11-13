@@ -71,7 +71,7 @@ int main (int argc, char **argv)
 
         // Todo: add noice to simulate error inm essurements
         mes.linear.x = lin_vel_ + abs(lin_vel_*noise(rng)*0);
-        mes.angular.z = ang_vel_+ ang_vel_*noise(rng)*10;
+        mes.angular.z = ang_vel_+ ang_vel_*noise(rng)*0;
 
         est_vel_pub.publish(mes);
 

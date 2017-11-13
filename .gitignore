@@ -1,3 +1,4 @@
 
 *.swp
 *~
+ras_project_camera/src/VGG16_trained_model.h5

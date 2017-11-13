@@ -43,8 +43,8 @@ sensor_msgs::LaserScan FakeLidar::fakeScan()
 {
     sensor_msgs::LaserScan fakey;
     std_msgs::Header h;
-    h.frame_id = "truepos";
-    h.stamp = ros::Time();
+    h.frame_id = "laser";
+    h.stamp = ros::Time::now();
     fakey.header = h;
     fakey.angle_min = -3.12413907051;
     fakey.angle_max = 3.12413907051;
@@ -94,16 +94,16 @@ std::vector<float> FakeLidar::rayTrace()
     for(int a = 0; a<n_angles; a++)
     {
         int n_walls = map.size();
-        float angle_n = angle + angle_increment*a + PI;
+        float angle_n = angle + angle_increment*a - 0.03*PI;
         float ca = cos(angle_n);
         float sa = sin(angle_n);
         dists[a] = 10;
         for(int w = 0; w<n_walls; w++)
         {
-            float x1 = map[w].x1 - x,
-                  x2 = map[w].x2 - x,
-                  y1 = map[w].y1 - y,
-                  y2 = map[w].y2 - y;
+            float x1 = map[w].x1 - x + cos(angle+PI/2)*0.07,
+                  x2 = map[w].x2 - x + cos(angle+PI/2)*0.07,
+                  y1 = map[w].y1 - y + sin(angle+PI/2)*0.07,
+                  y2 = map[w].y2 - y + sin(angle+PI/2)*0.07;
 
             float x1_new = x1*ca + y1*sa,
                   x2_new = x2*ca + y2*sa,

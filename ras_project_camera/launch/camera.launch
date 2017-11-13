@@ -16,7 +16,18 @@
 <param name="blue_h_min" type="int" value="15"/>
 <param name="blue_s_min" type="int" value="100"/>
 <param name="blue_v_min" type="int" value="30"/>
+
+<param name="yellow_h_max" type="int" value="110"/>
+<param name="yellow_s_max" type="int" value="255"/>
+<param name="yellow_v_max" type="int" value="255"/>
+<param name="yellow_h_min" type="int" value="80"/>
+<param name="yellow_s_min" type="int" value="40"/>
+<param name="yellow_v_min" type="int" value="40"/>
+
 <param name="morph" type="int" value="10"/>
+<param name="nb_of_colors" type="int" value="2"/>
+<param name="minTargetRadius" type="int" value="20"/>
+<param name="maxTargetRadius" type="int" value="200"/>
 </node>
 
 <!-- <node name="camera_pcl" pkg="ras_project_camera" type="camera_pcl" output="screen"> </node> -->

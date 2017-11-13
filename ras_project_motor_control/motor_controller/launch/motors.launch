@@ -7,7 +7,7 @@
         <param name="serial" type="int" value="475398" />
 	<param name="name" type="string" value="right_motor" />
     </node>
-    <node name="motor_controller" pkg="motor_controller" type="motor_controller" output="screen">
+    <node name="motor_controller" pkg="motor_controller" type="motor_controller" >
     <param name="proportion_left" type="double" value="0.0"/>
     <param name="proportion_right" type="double" value="0.0"/>
     <param name="alpha_left" type="double" value="2.5"/>

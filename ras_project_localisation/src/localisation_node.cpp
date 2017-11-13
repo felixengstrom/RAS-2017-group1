@@ -16,7 +16,6 @@ struct Line{
     float y1;
     float y2;
 };
-
 class ParticleFilter
 {
     private:
@@ -28,7 +27,8 @@ class ParticleFilter
         std::normal_distribution<double> ang_noise;
         std::vector<Line> map;
         void initiateParticles( int nParticles);
-        sensor_msgs::LaserScan fakeScan(const geometry_msgs::Point32 &p,float angle, int n_rays);
+        sensor_msgs::LaserScan fakeScan(const geometry_msgs::Point32 &p,
+                                        float angle, int n_rays);
         ros::Subscriber laser_sub;
         ros::Publisher location_pub;
         double lidar_displ_x;
@@ -38,6 +38,7 @@ class ParticleFilter
     public:
       
         tf::TransformListener listener;
+        void update_lastPose();
         geometry_msgs::PoseStamped lastPose;
         sensor_msgs::LaserScan latest_scan;
         bool hasScan;
@@ -49,35 +50,43 @@ class ParticleFilter
                        int _nParticles,
                        int _nScans,
                        std::vector<Line> _map);
-        void update_particles_position();
+        void update_particles_position(ros::Time t);
         void update_particles_weight();
         void resample_particles();
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
 };
 
+bool myfunction (int i,int j) { return (i>j); }
+
 ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
                                int _nParticles,
                                int _nScans,
-                               std::vector<Line> _map):nParticles(_nParticles), vel_noise(0,0.1),
+                               std::vector<Line> _map):nParticles(_nParticles), 
+                                                       vel_noise(0,0.1),
                                                        n(),nScans(_nScans),
-                                                       ang_noise(0,0.05), particles(), map(_map), hasScan(false)
+                                                       ang_noise(0,0.05), 
+                                                       particles(), map(_map),
+                                                       hasScan(false)
 {   
     initialPose.header.stamp = ros::Time::now();
     tf::StampedTransform transform;
     try{
-        listener.waitForTransform("robot","laser",ros::Time(0), ros::Duration(2));
-        listener.lookupTransform("robot","laser",ros::Time(0), transform);
+        listener.waitForTransform("robot","laser",
+                                  ros::Time(0), ros::Duration(2));
+        listener.lookupTransform("robot","laser",
+                                 ros::Time(0), transform);
     } catch(tf::TransformException &ex)
-   {
+    {
         ROS_INFO("particle update failed");
     }
+
     lidar_displ_x = transform.getOrigin().x();
     lidar_displ_y = transform.getOrigin().y();
     lidar_displ_omega = tf::getYaw(transform.getRotation());
-    ROS_INFO("lidar displasement in relation to robot: x : %f, y : %f, omega : %f", lidar_displ_x, lidar_displ_y,lidar_displ_omega);
+
     lastPose = initialPose;
+
     initiateParticles(nParticles);
-   /// location_pub  = n.advertise("location"
     laser_sub = n.subscribe("scan", 1, &ParticleFilter::scanCallback, this);
 }
 
@@ -86,7 +95,9 @@ void ParticleFilter::initiateParticles( int nParticles)
     
     tf::StampedTransform transform;
     geometry_msgs::Point initialPoint = lastPose.pose.position;
-    double initialAng = atan2(lastPose.pose.orientation.w, lastPose.pose.orientation.z)*2;
+    double initialAng = atan2(lastPose.pose.orientation.z,
+                              lastPose.pose.orientation.w)*2;
+
     std::vector<geometry_msgs::Point32> ps(nParticles); 
     std::vector<sensor_msgs::ChannelFloat32> ch(nParticles);
 
@@ -108,6 +119,7 @@ void ParticleFilter::initiateParticles( int nParticles)
     particles.points = ps;
     particles.channels = ch;
 }
+
 void ParticleFilter::resample_particles()
 {
     double wSum = 0;
@@ -142,7 +154,7 @@ void ParticleFilter::resample_particles()
     {
         double uni = rand()*sum/RAND_MAX;  
         int ind = cumulative.upper_bound(uni)->second;
-        //std::cout << uni<< " " << ind << "\n";
+        //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
         newPs[i].x += vel_noise(rng)*0.1;
         newPs[i].y += vel_noise(rng)*0.1;
@@ -157,17 +169,18 @@ void ParticleFilter::resample_particles()
 void ParticleFilter::scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
     hasScan = true;
+    update_particles_position(msg->header.stamp);
     latest_scan = sensor_msgs::LaserScan(*msg);
 }
 
-void ParticleFilter::update_particles_position()
+void ParticleFilter::update_particles_position(ros::Time t)
 {
    
-    ros::Time t = ros::Time::now();
     tf::StampedTransform transform;
     try{
-        listener.waitForTransform("odom",lastPose.header.stamp,"odom",t ,"map",ros::Duration(1));
-        listener.lookupTransform("odom",lastPose.header.stamp,"odom",t ,"map", transform);
+        listener.waitForTransform("odom",latest_scan.header.stamp,"odom",t ,"map",ros::Duration(1));
+        listener.lookupTransform("odom",latest_scan.header.stamp,"odom",t ,"map", transform);
+        //ROS_INFO("found scan for odometry movement t1 %f, t2 %f", latest_scan.header.stamp.toSec(), t.toSec());
     } catch(tf::TransformException &ex)
     {
         ROS_INFO("particle update failed");
@@ -178,7 +191,7 @@ void ParticleFilter::update_particles_position()
     {
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
-        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)) + ang_noise(rng);
+        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)) + ang_noise(rng)*0.4;
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
@@ -186,14 +199,10 @@ void ParticleFilter::update_particles_position()
         particles.points[i].x += cos(omega_n)*vt + vt*(float)vel_noise(rng)*cos(omega_n);
         particles.points[i].y += sin(omega_n)*vt + vt*(float)vel_noise(rng)*sin(omega_n);
     }
+}
 
-    lastPose.header.stamp = t;
-
-    if (hasScan){
-        update_particles_weight();
-        resample_particles();
-    }
-
+void ParticleFilter::update_lastPose()
+{
     double mean_x = 0;
     double mean_y = 0;
     double sum_sin = 0;
@@ -210,7 +219,7 @@ void ParticleFilter::update_particles_position()
     mean_y = mean_y/nParticles;
     double mean_omega = atan2(sum_sin, sum_cos);
 
-    lastPose.header.stamp = t;
+    lastPose.header.stamp = latest_scan.header.stamp;
     lastPose.pose.position.x= mean_x;
     lastPose.pose.position.y= mean_y;
     lastPose.pose.orientation.w = cos(mean_omega*0.5);
@@ -223,30 +232,30 @@ void ParticleFilter::update_particles_weight()
     int nAngles = laser_values.size();
 
     std::vector<int> inds;
-    float var = 1;
+    float var = 0.5;
     double angle_increment = 2*PI/nAngles;
 
     //find values that are not infinate in the laser.
     for(int ind = 0; ind<nAngles;ind++)
     {
-        if (laser_values[ind]<10) //should really check if value not == inf, but who cares?                           
+        if (laser_values[ind]<3) //should really check if value not == inf, but who cares?                           
             //  We should not have values larger than 10 either
 
         {
             inds.push_back(ind);
         }
     }
-    nScans = inds.size();
+    int toScan = std::min(nScans, (int)inds.size());
    
 
     for (int i=0; i<nParticles;i++){
         geometry_msgs::Point32 p = particles.points[i];
         float angle = particles.channels[i].values[0];
-        std::vector<float> angles(nScans);
-        std::vector<float> dists(nScans);
+        std::vector<float> angles(toScan);
+        std::vector<float> dists(toScan);
         std::shuffle(inds.begin(), inds.end(), rng);
 
-        for (int j=0; j<nScans; j++)
+        for (int j=0; j<toScan; j++)
         {
             angles[j]=inds[j]*angle_increment;
             dists[j] = laser_values[inds[j]];
@@ -255,9 +264,15 @@ void ParticleFilter::update_particles_weight()
         std::vector<float> rays = rayTrace(p, angle, angles);
 
         float weight = 0;
-        for (int j=0; j<nScans; j++)
+        std::vector<float> weights(toScan);
+        for (int j=0; j<toScan; j++)
         {
-            weight += -pow((rays[j] - dists[j])/var, 2.0) - log(var*0.1);
+            weights[j] = -pow((rays[j] - dists[j]), 2.0)/var;
+        }
+        std::sort(weights.begin(), weights.end(), myfunction);
+        for (int j=0; j<toScan - int(toScan/4); j++)
+        {
+            weight += weights[j];
         }
 
         particles.channels[i].values[1] = weight;
@@ -358,10 +373,9 @@ int main(int argc, char*argv[])
 
     
 
-    ros::Rate rate(10);
     ros::NodeHandle n;
     ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
-    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("robot/pose", 10);
+    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("/localisation/pose", 10);
 
     geometry_msgs::PoseStamped pp;
     std_msgs::Header h;
@@ -378,13 +392,18 @@ int main(int argc, char*argv[])
     q.z = sin(alpha/2);
     pp.pose.orientation = q;
     
-    ParticleFilter pf(pp, 1000,160, map);   
+    ParticleFilter pf(pp, 1000,16, map);   
+
+    ros::Rate rate(100);
     while (ros::ok()){
+        if (pf.hasScan){
+            pf.update_particles_weight();
+            pf.resample_particles();
+        }
+        pf.update_lastPose();
         parts.publish(pf.particles);
-        pf.update_particles_position();
         truepose.publish(pf.lastPose); 
         ros::spinOnce();
         rate.sleep();
-        tf::StampedTransform transform;
     }
 }
