@@ -17,9 +17,10 @@ class PathFollowing
 		int angle_ok;
 		int distance_ok;
 		ros::Time teleopTime;
+        bool updated;
 
 	public:
-		PathFollowing() : angle_ok(0), distance_ok(0)
+		PathFollowing() : angle_ok(0), distance_ok(0), updated(false)
 	{
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();
@@ -39,16 +40,22 @@ void PathFollowing::teleopCallback (const geometry_msgs::PoseArray::ConstPtr& ms
   	 poses = *msg;
   	 current_pose = 0;
   	 nb_poses = poses.poses.size();
+     updated = true;
 	}
 }
 
 void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {
+   if(!updated){return;}
    geometry_msgs::PoseStamped robot_pose = *msg;
    geometry_msgs::Twist move;
-   double theta = atan2(poses.poses[current_pose].position.y-robot_pose.pose.position.y, poses.poses[current_pose].position.x-robot_pose.pose.position.x);
+   double y_desired = poses.poses[current_pose].position.y;
+   double y_current = robot_pose.pose.position.y;
+   double x_desired = poses.poses[current_pose].position.x;
+   double x_current = robot_pose.pose.position.x;
+   double theta = atan2(y_desired-y_current, x_desired-x_current);
    float desired_angle = theta-(atan2(robot_pose.pose.orientation.z,robot_pose.pose.orientation.w)*2.0);
    ROS_INFO("Angle desired: %f", desired_angle);
-   double distance = std::sqrt(std::pow(poses.poses[current_pose].position.x-robot_pose.pose.position.x,2)+std::pow(poses.poses[current_pose].position.y-robot_pose.pose.position.y,2));
+   double distance = std::sqrt(std::pow(x_current-x_desired,2)+std::pow(poses.poses[current_pose].position.y-robot_pose.pose.position.y,2));
    if (std::abs(desired_angle) < 0.05 || distance <= 0.01) {
 	if (distance > 0.01) {
 //	    if (distance > 0.1)
@@ -65,6 +72,7 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	    motor_pub.publish(move);
 	    if (current_pose != nb_poses-1)
 	    	current_pose++;
+        else updated = false;
 	}
    }
    else {
@@ -88,8 +96,8 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "path_following");
-    ros::Rate r(10);
     PathFollowing P;
+    ros::Rate r(10);
     while(ros::ok()) {
 	ros::spinOnce();
 	r.sleep();
