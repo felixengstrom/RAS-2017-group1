@@ -160,6 +160,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 		arp.position.x=Q1; arp.position.y=W1;
 		following_points.poses.push_back(arp);
 	}
+	following_points.header.stamp = goal_update;
 	Path_pub.publish(wall_marker);
 	Path_follower_pub.publish(following_points);
 	}

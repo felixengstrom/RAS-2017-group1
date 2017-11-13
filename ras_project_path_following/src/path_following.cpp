@@ -4,21 +4,45 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <math.h>
+class PathFollowing
+{
+	private:
+		ros::NodeHandle n;
+		ros::Publisher motor_pub;
+		ros::Subscriber teleop_sub;
+		ros::Subscriber odometry_sub;
+		geometry_msgs::PoseArray poses;
+		int current_pose;
+		int nb_poses;
+		int angle_ok;
+		int distance_ok;
+		ros::Time teleopTime;
 
-ros::Publisher motor_pub;
-geometry_msgs::PoseArray poses;
-int current_pose;
-int nb_poses;
-int angle_ok = 0;
-int distance_ok = 0;
+	public:
+		PathFollowing() : angle_ok(0), distance_ok(0)
+	{
+		n = ros::NodeHandle();
+		teleopTime = ros::Time::now();
+    		teleop_sub = n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
+    		odometry_sub = n.subscribe("/robot/pose", 10, &PathFollowing::odometryCallback,this);
+    		motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
+	}
+		void teleopCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
+		void odometryCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+};
 
-void teleopCallback (const geometry_msgs::PoseArray::ConstPtr& msg) {
-   poses = *msg;
-   current_pose = 0;
-   nb_poses = poses.poses.size();
+void PathFollowing::teleopCallback (const geometry_msgs::PoseArray::ConstPtr& msg) {
+	ros::Time cur = msg->header.stamp;
+	if(cur != teleopTime)
+	{	
+	teleopTime = cur;
+  	 poses = *msg;
+  	 current_pose = 0;
+  	 nb_poses = poses.poses.size();
+	}
 }
 
-void odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {
+void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {
    geometry_msgs::PoseStamped robot_pose = *msg;
    geometry_msgs::Twist move;
    double theta = atan2(poses.poses[current_pose].position.y-robot_pose.pose.position.y, poses.poses[current_pose].position.x-robot_pose.pose.position.x);
@@ -64,19 +88,11 @@ void odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "path_following");
-    ros::NodeHandle n;
-    ros::Subscriber teleop_sub = n.subscribe("/pose_teleop", 10, teleopCallback);
-    ros::Subscriber odometry_sub = n.subscribe("/robot/pose", 10, odometryCallback);
-    motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
-    ros::Rate loop_rate(10);
-    geometry_msgs::Pose pose;
-    pose.position.x = 0;
-    pose.position.y = 0;
-    pose.orientation.w = 1;
-    poses.poses.push_back(pose);
-    nb_poses = 1;
-    current_pose = 0;
+    ros::Rate r(10);
+    PathFollowing P;
     while(ros::ok()) {
-	ros::spin();
+	ros::spinOnce();
+	r.sleep();
     }
+    return 0;
 }
