@@ -27,7 +27,8 @@ class ParticleFilter
         std::normal_distribution<double> ang_noise;
         std::vector<Line> map;
         void initiateParticles( int nParticles);
-        sensor_msgs::LaserScan fakeScan(const geometry_msgs::Point32 &p,float angle, int n_rays);
+        sensor_msgs::LaserScan fakeScan(const geometry_msgs::Point32 &p,
+                                        float angle, int n_rays);
         ros::Subscriber laser_sub;
         ros::Publisher location_pub;
         double lidar_displ_x;
@@ -48,37 +49,70 @@ class ParticleFilter
                        int _nParticles,
                        int _nScans,
                        std::vector<Line> _map);
-        void update_particles_position();
+        void update_particles_position(ros::Time t);
         void update_particles_weight();
         void resample_particles();
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
 };
 
 bool myfunction (int i,int j) { return (i>j); }
+//geometry_msgs::PoseStamped ParticleFilter::getCurrentPose()
+//{
+//    geometry_msgs::PoseStamped currentPose(lastPose);
+//
+//    tf::StampedTransform transform;
+//    ros::Time t  = ros::Time::now();
+//    try{
+//        listener.waitForTransform("odom",lastPose.header.stamp,"odom",t ,"map",ros::Duration(1));
+//        listener.lookupTransform("odom",lastPose.header.stamp,"odom",t ,"map", transform);
+//    } catch(tf::TransformException &ex)
+//    {
+//        ROS_INFO("particle update failed");
+//        std::cout << ex.what() << "\n";
+//    }
+//    double currentAng = atan2(lastPose.pose.orientation.z, lastPose.pose.orientation.w)*2;
+//    ROS_INFO("%f", currentAng);
+//    currentPose.pose.position.x += cos(currentAng)*transform.getOrigin().x()
+//                                  -sin(currentAng)*transform.getOrigin().y();
+//    currentPose.pose.position.y += cos(currentAng)*transform.getOrigin().y()
+//                                 +sin(currentAng)*transform.getOrigin().x();
+//    double changeAng = tf::getYaw(transform.getRotation());
+//    ROS_INFO("%f", changeAng);
+//    currentPose.pose.orientation.w = cos((currentAng + changeAng )*0.5);
+//    currentPose.pose.orientation.z = sin((currentAng + changeAng )*0.5);
+//    currentPose.header.stamp = t;
+//    return currentPose;
+//}
 
 ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
                                int _nParticles,
                                int _nScans,
-                               std::vector<Line> _map):nParticles(_nParticles), vel_noise(0,0.1),
+                               std::vector<Line> _map):nParticles(_nParticles), 
+                                                       vel_noise(0,0.1),
                                                        n(),nScans(_nScans),
-                                                       ang_noise(0,0.05), particles(), map(_map), hasScan(false)
+                                                       ang_noise(0,0.05), 
+                                                       particles(), map(_map),
+                                                       hasScan(false)
 {   
     initialPose.header.stamp = ros::Time::now();
     tf::StampedTransform transform;
     try{
-        listener.waitForTransform("robot","laser",ros::Time(0), ros::Duration(2));
-        listener.lookupTransform("robot","laser",ros::Time(0), transform);
+        listener.waitForTransform("robot","laser",
+                                  ros::Time(0), ros::Duration(2));
+        listener.lookupTransform("robot","laser",
+                                 ros::Time(0), transform);
     } catch(tf::TransformException &ex)
-   {
+    {
         ROS_INFO("particle update failed");
     }
+
     lidar_displ_x = transform.getOrigin().x();
     lidar_displ_y = transform.getOrigin().y();
     lidar_displ_omega = tf::getYaw(transform.getRotation());
-    ROS_INFO("lidar displasement in relation to robot: x : %f, y : %f, omega : %f", lidar_displ_x, lidar_displ_y,lidar_displ_omega);
+
     lastPose = initialPose;
+
     initiateParticles(nParticles);
-   /// location_pub  = n.advertise("location"
     laser_sub = n.subscribe("scan", 1, &ParticleFilter::scanCallback, this);
 }
 
@@ -87,7 +121,9 @@ void ParticleFilter::initiateParticles( int nParticles)
     
     tf::StampedTransform transform;
     geometry_msgs::Point initialPoint = lastPose.pose.position;
-    double initialAng = atan2(lastPose.pose.orientation.w, lastPose.pose.orientation.z)*2;
+    double initialAng = atan2(lastPose.pose.orientation.z,
+                              lastPose.pose.orientation.w)*2;
+
     std::vector<geometry_msgs::Point32> ps(nParticles); 
     std::vector<sensor_msgs::ChannelFloat32> ch(nParticles);
 
@@ -109,6 +145,7 @@ void ParticleFilter::initiateParticles( int nParticles)
     particles.points = ps;
     particles.channels = ch;
 }
+
 void ParticleFilter::resample_particles()
 {
     double wSum = 0;
@@ -145,8 +182,8 @@ void ParticleFilter::resample_particles()
         int ind = cumulative.upper_bound(uni)->second;
         //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
-        newPs[i].x += vel_noise(rng)*1.0;
-        newPs[i].y += vel_noise(rng)*1.0;
+        newPs[i].x += vel_noise(rng)*0.1;
+        newPs[i].y += vel_noise(rng)*0.1;
         newCh[i] = particles.channels[ind];
         newCh[i].values[0] += vel_noise(rng)*0.1;
     }
@@ -158,17 +195,18 @@ void ParticleFilter::resample_particles()
 void ParticleFilter::scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
     hasScan = true;
+    update_particles_position(msg->header.stamp);
     latest_scan = sensor_msgs::LaserScan(*msg);
 }
 
-void ParticleFilter::update_particles_position()
+void ParticleFilter::update_particles_position(ros::Time t)
 {
    
-    ros::Time t = ros::Time::now();
     tf::StampedTransform transform;
     try{
-        listener.waitForTransform("odom",lastPose.header.stamp,"odom",t ,"map",ros::Duration(1));
-        listener.lookupTransform("odom",lastPose.header.stamp,"odom",t ,"map", transform);
+        listener.waitForTransform("odom",latest_scan.header.stamp,"odom",t ,"map",ros::Duration(1));
+        listener.lookupTransform("odom",latest_scan.header.stamp,"odom",t ,"map", transform);
+        //ROS_INFO("found scan for odometry movement t1 %f, t2 %f", latest_scan.header.stamp.toSec(), t.toSec());
     } catch(tf::TransformException &ex)
     {
         ROS_INFO("particle update failed");
@@ -363,7 +401,7 @@ int main(int argc, char*argv[])
 
     ros::NodeHandle n;
     ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
-    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("robot/pose", 10);
+    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("/localisation/pose", 10);
 
     geometry_msgs::PoseStamped pp;
     std_msgs::Header h;
@@ -384,7 +422,6 @@ int main(int argc, char*argv[])
 
     ros::Rate rate(100);
     while (ros::ok()){
-        pf.update_particles_position();
         if (pf.hasScan){
             pf.update_particles_weight();
             pf.resample_particles();
