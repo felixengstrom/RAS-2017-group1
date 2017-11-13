@@ -1,7 +1,7 @@
 #include <math.h>
 #include <ros/ros.h>
 #include "uarm/Pump.h"
-#include <std_msgs/Int32.h>
+#include <std_msgs/Bool.h>
 #include "uarm/MoveToJoints.h"
 #include "tf/transform_listener.h"
 #include <geometry_msgs/PointStamped.h>
@@ -44,7 +44,7 @@ class UarmController{
         void moveToPointCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
         bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
                                 ras_project_uarm::MoveArmCartesian::Response &res);
-        void engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg);
+        void engageSuctionCallback(const std_msgs::Bool::ConstPtr& msg);
         AngleSetting invKinematic(double x,double y,double z);
 };
 
@@ -184,7 +184,7 @@ AngleSetting UarmController::invKinematic(double x,double y,double z)
     return angs;
 }
 
-void UarmController::engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg)
+void UarmController::engageSuctionCallback(const std_msgs::Bool::ConstPtr& msg)
 {
     if (msg->data == 1)
     {

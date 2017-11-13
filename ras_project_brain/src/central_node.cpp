@@ -14,6 +14,7 @@ public:
     ros::NodeHandle n;
     ros::Publisher objectDetection_publisher;
     ros::Publisher objectPosition_publisher;
+    ros::Publisher arm_engageSuction_publisher;
     ros::Subscriber objectDetection_subscriber;
     tf::TransformListener listener;
 
@@ -24,8 +25,10 @@ public:
         object_detected_flag = 1;
         start_coordCalc = 0;
         object_x_position = 0.0;
+        engage_suction = 0;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 1);
         objectPosition_publisher = n.advertise<std_msgs::Float32>("/motorController/moveToObj", 1);
+        arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("uarm/engageSuction",1);
         /*Needed only if x,y,z are being published randomly by the camera even when the object is not detected, else it can be removed
         objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);*/
         objectDetection_subscriber = n.subscribe("/camera/image/object_detected", 1, &CentralNode::objectDetectionCallback, this);
@@ -83,26 +86,30 @@ public:
            }
            object_x_position = transform.getOrigin().x();
            /*******Convert into cm and put the exact values********/
-           diff_distance = object_x_position - 25.0;
+           diff_distance = object_x_position - 0.26;
            ROS_INFO("Difference calculated --> %0.2f",diff_distance);
-           if(diff_distance<-3 || diff_distance>3)
+           if(diff_distance<-0.03 || diff_distance>0.03)
            {
                msg_odomDiffDist_float.data = diff_distance;
            }
            else
            {
+               engage_suction = 1;
                msg_odomDiffDist_float.data = 0.0;
+
            }
+           msg_uarm_engageSuction_bool.data = engage_suction;
            objectPosition_publisher.publish(msg_odomDiffDist_float);
+           arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
        }
     }
 
 private:
     bool object_detected,object_detected_flag;
-    bool start_coordCalc;
+    bool start_coordCalc, engage_suction;
     float object_x_position, diff_distance;
     std_msgs::String msg_eSpeak_string;
-    std_msgs::Bool msg_tfObjCalc_bool;
+    std_msgs::Bool msg_tfObjCalc_bool,msg_uarm_engageSuction_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
 };
 
