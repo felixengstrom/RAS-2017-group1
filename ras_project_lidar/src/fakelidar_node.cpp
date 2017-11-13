@@ -44,7 +44,7 @@ sensor_msgs::LaserScan FakeLidar::fakeScan()
     sensor_msgs::LaserScan fakey;
     std_msgs::Header h;
     h.frame_id = "laser";
-    h.stamp = ros::Time();
+    h.stamp = ros::Time::now();
     fakey.header = h;
     fakey.angle_min = -3.12413907051;
     fakey.angle_max = 3.12413907051;
