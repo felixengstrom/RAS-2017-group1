@@ -63,9 +63,12 @@ class PathPlanning
 		//A* Heuristic wall avoiding value
 		int Wall_step;
 		double Wall_cost;
+		int Wall_tolerance; //integer can not be bigger than Wall_step!
+		double WallT;
 	public:
-		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(1), Wall_cost(10)
+		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(4), Wall_cost(10),Wall_tolerance(1)
 		{
+			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 		n = ros::NodeHandle();
 		t_update=ros::Time::now();
 		goal_update=ros::Time::now();
@@ -76,6 +79,7 @@ class PathPlanning
 		Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 		Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
 		}
+		double checkwall(const int index_now);
    		double  heuristic(const point& p1, const point& p2);
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 		{x_start=msg->pose.position.x; y_start = msg-> pose.position.y; return; }
@@ -87,14 +91,14 @@ class PathPlanning
 		void loop_function();
 };
 
-
-double PathPlanning::heuristic(const point& p1, const point& p2)
+double PathPlanning::checkwall(const int index_now)
 {
 	int upper_limit = width_height*width_height;
-	int index_now=p1.x+p1.y*width_height;
 	int checkval;
-	double wall_weight;
-	wall_weight=0;
+	double maxval;
+	int dx,dy;
+	double tot;
+	maxval=0;
 	for(int i=-1*Wall_step; i<=Wall_step;i++)
 	{
 		for(int j=-1*Wall_step; j <= Wall_step; j++)
@@ -103,13 +107,25 @@ double PathPlanning::heuristic(const point& p1, const point& p2)
 		if(checkval > upper_limit || checkval < 0){continue;}
 		if(Csp[checkval]!=0)
 			{
-			return (double)(Wall_cost+sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2))); 
+				dx=Wall_step-abs(i)+1;
+				dy=Wall_step-abs(j)+1;
+				tot=sqrt(pow((double)dx,2)+pow((double)dy,2));
+				if(tot>maxval) maxval=tot;
+
 			}
 
 		}
 
 	}
-	return (double)sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2)); }
+	return maxval*Wall_cost;
+}
+double PathPlanning::heuristic(const point& p1, const point& p2)
+{
+	int index_now=p1.x+p1.y*width_height;
+	double cost;
+	cost = checkwall(index_now);
+	
+	return (double)(cost+sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2))); }
 void PathPlanning::loop_function()
 {
 
@@ -127,7 +143,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	geometry_msgs::PoseArray following_points;
 	geometry_msgs::Pose arp;
 	arp.position.x=Q0; arp.position.y=W0;
-	following_points.poses.push_back(arp);
+//	following_points.poses.push_back(arp); commented out because starting position is redundant, and fucks with path foloowing
 
 
 	//wall_marker is for rviz
@@ -186,51 +202,6 @@ void PathPlanning::GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 
 
 //
-//	ROS_INFO_STREAM("following smoothed path points were calculated (size of vector:  "<<path_list.size() << " ) ");
-//if(path_list.size()>0){
-//	double Q0,W0,Q1,W1;
-//	Q0=(path_list[0]%width_height)*res;
-//	W0=(path_list[0]/width_height)*res;
-//	//PoseArray
-//	geometry_msgs::PoseArray following_points;
-//	geometry_msgs::Pose arp;
-//	arp.position.x=Q0; arp.position.y=W0;
-//	following_points.poses.push_back(arp);
-//
-//
-//	//wall_marker is for rviz
-//	visualization_msgs::Marker wall_marker;
-//	wall_marker.header.frame_id = "/map";
-//	wall_marker.header.stamp = ros::Time();
-//	wall_marker.ns = "world";
-//	wall_marker.type = visualization_msgs::Marker::LINE_STRIP;
-//	wall_marker.action = visualization_msgs::Marker::ADD;
-//	wall_marker.scale.x = 0.01;
-//	wall_marker.color.a = 1.0;
-//	wall_marker.color.r = (0.0/255.0);
-//	wall_marker.color.g = (255.0/255.0);
-//	wall_marker.color.b = (0.0/255.0);
-//	wall_marker.pose.position.z = 0;
-//	wall_marker.pose.position.x = 0;
-//	wall_marker.pose.position.y = 0;
-//	geometry_msgs::Point pnt;
-//	pnt.x=Q0; pnt.y=W0;
-//	wall_marker.points.push_back(pnt);
-//	ROS_INFO_STREAM("I got HERE!");
-//	for(int i=1;i<path_list.size();i++)
-//	{
-//	
-//		Q1=(path_list[i]%width_height)*res;
-//		W1=(path_list[i]/width_height)*res;
-//		pnt.x=Q1;pnt.y=W1;
-//		wall_marker.points.push_back(pnt);
-//		ROS_INFO_STREAM(" x = " << Q1 << " y = " << W1);
-//
-//		arp.position.x=Q1; arp.position.y=W1;
-//		following_points.poses.push_back(arp);
-//	}
-//	Path_pub.publish(wall_marker);
-//	Path_follower_pub.publish(following_points); 
 
 }
 void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -367,7 +338,7 @@ while(openSet.size()!=0)
 			if(closeSet.find(iter_index)!=closeSet.end()){continue;}//check if already exist in closedset
 			point neighbour;
 			neighbour.x=current.x+j; neighbour.y=current.y+i;
-			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2));
+			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2)) +checkwall(iter_index); //HERE CHECKWALL
 			neighbour.f=neighbour.g+heuristic(neighbour,goalpos);
 			
 			if(openSet.find(iter_index)==openSet.end()){openSet.insert(std::pair<int,point>(iter_index,neighbour));}//check if already in openset
@@ -408,12 +379,16 @@ void PathPlanning::Reconstruct_path(int curr_index)
 	std::vector<int> reverse_smooth;
 	reverse_smooth.push_back(child);
 	smooth=child;
+	double wallT = Wall_tolerance * Wall_cost;
 while(parent!=child)
 {
 	child = parent;
 	parent = cameFrom[child];
 //	reverse_path.push_back(parent);
+	//if(checkwall(child)<wallT){continue;}
+	//else if(Checkline(smooth,parent)){continue;}
 	if(Checkline(smooth,parent)){continue;}
+		
 	reverse_smooth.push_back(child);
 	smooth=child;
 
@@ -471,6 +446,7 @@ bool PathPlanning::Checkline(int start, int goal)
 	{
 		while(Y!=Y1)
 		{
+			if(checkwall(width_height*Y+X)>=WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			Y=Y+step;
 		}
@@ -480,6 +456,7 @@ bool PathPlanning::Checkline(int start, int goal)
 
 		while(X!=X1)
 		{
+			if(checkwall(width_height*Y+X)>=WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			X=X+1;
 		}
@@ -491,12 +468,14 @@ bool PathPlanning::Checkline(int start, int goal)
 	
 		if(p>=0)
 		{
+			if(checkwall(width_height*Y+X)>=WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			Y=Y+step;
 			p=p+B;
 		}
 		else
 		{
+			if(checkwall(width_height*Y+X)>=WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			p=p+A;
 		}
@@ -517,12 +496,14 @@ bool PathPlanning::Checkline(int start, int goal)
 		
 			if(p>=0)
 			{
+				if(checkwall(width_height*Y+X)>=WallT){return false;}
 				if(Csp[width_height*Y+X]!=0){return false;}//found wall
 				X=X+1;
 				p=p+B;
 			}
 			else
 			{
+				if(checkwall(width_height*Y+X)>=WallT){return false;}
 				if(Csp[width_height*Y+X]!=0){return false;}//found wall
 				p=p+A;
 			}
