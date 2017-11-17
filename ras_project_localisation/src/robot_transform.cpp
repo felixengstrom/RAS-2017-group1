@@ -34,7 +34,7 @@ class RobotBroadcaster
 };
 void RobotBroadcaster::publishCurrentPose()
 {
-    geometry_msgs::PoseStamped currentPose(lastPose);
+    geometry_msgs::PoseStamped currentPose;
     tf::StampedTransform transform;
     ros::Time t  = ros::Time::now();
     tLast = t;
@@ -52,16 +52,19 @@ void RobotBroadcaster::publishCurrentPose()
     double currentAng = atan2(lastPose.pose.orientation.z,
                               lastPose.pose.orientation.w)*2;
 
-    currentPose.pose.position.x += cos(currentAng)*transform.getOrigin().x()
-                                  -sin(currentAng)*transform.getOrigin().y();
-    currentPose.pose.position.y += cos(currentAng)*transform.getOrigin().y()
-                                 +sin(currentAng)*transform.getOrigin().x();
+    currentPose.pose.position.x =lastPose.pose.position.x
+                                 + cos(currentAng)*transform.getOrigin().x()
+                                 - sin(currentAng)*transform.getOrigin().y();
+    currentPose.pose.position.y = lastPose.pose.position.y
+                                 + cos(currentAng)*transform.getOrigin().y()
+                                 + sin(currentAng)*transform.getOrigin().x();
 
     double changeAng = tf::getYaw(transform.getRotation());
 
     currentPose.pose.orientation.w = cos((currentAng + changeAng )*0.5);
     currentPose.pose.orientation.z = sin((currentAng + changeAng )*0.5);
     currentPose.header.stamp = t;
+    currentPose.header.frame_id = "map";
     pub.publish(currentPose);
     double x = currentPose.pose.position.x;
     double y = currentPose.pose.position.y;

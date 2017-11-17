@@ -37,7 +37,6 @@ class OdometryNode
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
             imu = n_.subscribe("imu/data", 10, &OdometryNode::IMUCallback, this);
-	    odom_pub = n_.advertise<geometry_msgs::PoseStamped>("robot/pose", 1000);
         }
         void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
         void UpdatePosition();
@@ -68,7 +67,6 @@ void OdometryNode::UpdatePosition()
     pose.pose.position.y = current_y;
     pose.pose.orientation.w = cos(0.5*current_omega);
     pose.pose.orientation.z = sin(0.5*current_omega);
-    odom_pub.publish(pose);
 
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
