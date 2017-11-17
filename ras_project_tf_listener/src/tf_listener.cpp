@@ -6,11 +6,11 @@
 
 #define TRUE 1
 
-static bool objectDetected;
+static bool objectPickUp;
 
 void chatterCallback(const std_msgs::Bool::ConstPtr& msg)
 {
-  objectDetected = msg->data;
+  objectPickUp = msg->data;
 }
 
 int main(int argc, char** argv){
@@ -18,7 +18,7 @@ int main(int argc, char** argv){
 
   ros::NodeHandle node;
   ros::ServiceClient client = node.serviceClient<ras_project_uarm::MoveArmCartesian>("/uarm/moveToPose");
-  ros::Subscriber sub = node.subscribe("/camera/image/object_detected", 1, chatterCallback);
+  ros::Subscriber sub = node.subscribe("/tf/pickup_obj", 1, chatterCallback);
   ras_project_uarm::MoveArmCartesian srv;
   tf::TransformListener listener;
 
@@ -26,7 +26,7 @@ int main(int argc, char** argv){
   while (node.ok())
   {
     tf::StampedTransform transform;
-    if(objectDetected == TRUE && srv.response.error != TRUE)
+    if(objectPickUp == TRUE && srv.response.error != TRUE)
     {
         try
         {
@@ -51,7 +51,7 @@ int main(int argc, char** argv){
      if(client.call(srv))
      {
         ROS_INFO("%d",srv.response.error);
-        objectDetected = !TRUE;
+        objectPickUp = !TRUE;
      }
     }
 

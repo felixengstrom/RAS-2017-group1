@@ -13,10 +13,10 @@ int main( int argc, char ** argv)
         ros::Rate rate(1000.0);
         while (n.ok())
         {
-            transform.setOrigin(tf::Vector3(0.13,0.0,0.125));
+            transform.setOrigin(tf::Vector3(0.14,0.0,0.125));
             //q.setRPY(0,-0.105,0);
             //transform.setOrigin(tf::Vector3(.274,0.0,-0.049));
-            q.setRPY(0.0,0.9,0);
+            q.setRPY(0.0,0.95,0);
             transform.setRotation(q);
             br.sendTransform(tf::StampedTransform(transform, ros::Time::now(),"robot","camera"));
             rate.sleep();

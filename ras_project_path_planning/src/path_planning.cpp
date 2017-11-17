@@ -66,7 +66,7 @@ class PathPlanning
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(4), Wall_cost(10),Wall_tolerance(1)
+		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(1), Wall_cost(10),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 		n = ros::NodeHandle();
@@ -379,7 +379,6 @@ void PathPlanning::Reconstruct_path(int curr_index)
 	std::vector<int> reverse_smooth;
 	reverse_smooth.push_back(child);
 	smooth=child;
-	double wallT = Wall_tolerance * Wall_cost;
 while(parent!=child)
 {
 	child = parent;
@@ -446,7 +445,7 @@ bool PathPlanning::Checkline(int start, int goal)
 	{
 		while(Y!=Y1)
 		{
-			if(checkwall(width_height*Y+X)>=WallT){return false;}
+			if(checkwall(width_height*Y+X)>WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			Y=Y+step;
 		}
@@ -456,7 +455,7 @@ bool PathPlanning::Checkline(int start, int goal)
 
 		while(X!=X1)
 		{
-			if(checkwall(width_height*Y+X)>=WallT){return false;}
+			if(checkwall(width_height*Y+X)>WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			X=X+1;
 		}
@@ -468,14 +467,14 @@ bool PathPlanning::Checkline(int start, int goal)
 	
 		if(p>=0)
 		{
-			if(checkwall(width_height*Y+X)>=WallT){return false;}
+			if(checkwall(width_height*Y+X)>WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			Y=Y+step;
 			p=p+B;
 		}
 		else
 		{
-			if(checkwall(width_height*Y+X)>=WallT){return false;}
+			if(checkwall(width_height*Y+X)>WallT){return false;}
 			if(Csp[width_height*Y+X]!=0){return false;}//found wall
 			p=p+A;
 		}
@@ -496,14 +495,14 @@ bool PathPlanning::Checkline(int start, int goal)
 		
 			if(p>=0)
 			{
-				if(checkwall(width_height*Y+X)>=WallT){return false;}
+				if(checkwall(width_height*Y+X)>WallT){return false;}
 				if(Csp[width_height*Y+X]!=0){return false;}//found wall
 				X=X+1;
 				p=p+B;
 			}
 			else
 			{
-				if(checkwall(width_height*Y+X)>=WallT){return false;}
+				if(checkwall(width_height*Y+X)>WallT){return false;}
 				if(Csp[width_height*Y+X]!=0){return false;}//found wall
 				p=p+A;
 			}

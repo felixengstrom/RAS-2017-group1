@@ -4,11 +4,11 @@
 #include <tf/transform_listener.h>
 #include <sensor_msgs/LaserScan.h>
 
-
 class RobotBroadcaster
 {
 
     private:
+         ros::Time tLast;
          ros::NodeHandle n;
          ros::Subscriber sub;
          ros::Publisher pub;
@@ -20,9 +20,10 @@ class RobotBroadcaster
     public:
          RobotBroadcaster(ros::NodeHandle _n):n(_n), br(), transform()
          {
-            sub = n.subscribe("/localisation/pose", 10,
+            sub = n.subscribe("/localisation/pose", 1,
                               &RobotBroadcaster::robotPoseCallback, this);
-            pub = n.advertise<geometry_msgs::PoseStamped>("/robot/pose", 10);
+            pub = n.advertise<geometry_msgs::PoseStamped>("/robot/pose", 1);
+            tLast = ros::Time::now();
          
          };
          void publishCurrentPose();
@@ -36,6 +37,7 @@ void RobotBroadcaster::publishCurrentPose()
     geometry_msgs::PoseStamped currentPose(lastPose);
     tf::StampedTransform transform;
     ros::Time t  = ros::Time::now();
+    tLast = t;
     try{
         listener.waitForTransform("odom",lastPose.header.stamp,
                                   "odom",t ,"map",ros::Duration(1));

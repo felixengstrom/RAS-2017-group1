@@ -4,15 +4,23 @@
 #include <geometry_msgs/PointStamped.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
+#include <std_msgs/Bool.h>
+
+#define TRUE 1
 
 static geometry_msgs::PointStamped object_point;
+static bool object_present;
 
 void objectPosition_Callback(const geometry_msgs::Point::ConstPtr& msg)
 {
   /* Here the x,y,z position of the object wrt the camera frame are taken */
   object_point.point.x = msg->x;
-  object_point.point.y = msg->y;
+  object_point.point.y = -msg->y;
   object_point.point.z = msg->z;
+}
+void objectDetection_Callback(const std_msgs::Bool::ConstPtr& msg)
+{
+    object_present = msg->data;
 }
 
 void transformPoint(const tf::TransformListener& listener)
@@ -27,24 +35,27 @@ void transformPoint(const tf::TransformListener& listener)
     //we'll just use the most recent transform available for our simple example
     object_point.header.stamp = ros::Time(0);
 
- 
-try{
-    geometry_msgs::PointStamped object_point_base;
-    listener.transformPoint("robot", object_point, object_point_base);
+    if(TRUE == object_present)
+    {
+        try
+        {
+            geometry_msgs::PointStamped object_point_base;
+            listener.transformPoint("robot", object_point, object_point_base);
   
-    ROS_INFO("object: (%.2f, %.2f. %.2f) -----> robot: (%.2f, %.2f, %.2f) at time %.2f",
-    object_point.point.x, object_point.point.y, object_point.point.z,
-    object_point_base.point.x, object_point_base.point.y, object_point_base.point.z, object_point_base.header.stamp.toSec());
-    transform.setOrigin(tf::Vector3(object_point_base.point.x,object_point_base.point.y,object_point_base.point.z));
-    q.setRPY(0,0.0,0);
-    transform.setRotation(q);
+            ROS_INFO("object: (%.2f, %.2f. %.2f) -----> robot: (%.2f, %.2f, %.2f) at time %.2f",
+            object_point.point.x, object_point.point.y, object_point.point.z,
+            object_point_base.point.x, object_point_base.point.y, object_point_base.point.z, object_point_base.header.stamp.toSec());
+            transform.setOrigin(tf::Vector3(object_point_base.point.x,object_point_base.point.y,object_point_base.point.z));
+            q.setRPY(0,0.0,0);
+            transform.setRotation(q);
 
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(),"robot","object"));
-}
-catch(tf::TransformException& ex){
-    ROS_ERROR("Received an exception trying to transform a point from \"camera\" to \"robot\": %s", ex.what());
+            br.sendTransform(tf::StampedTransform(transform, ros::Time::now(),"robot","object"));
+        }
+        catch(tf::TransformException& ex)
+        {
+            ROS_ERROR("Received an exception trying to transform a point from \"camera\" to \"robot\": %s", ex.what());
+        }
     }
-    
 }
  
 int main(int argc, char** argv)
@@ -52,7 +63,8 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "object_position_transform");
     ros::NodeHandle n;
     tf::TransformListener listener(ros::Duration(10));
-    ros::Subscriber sub = n.subscribe("camera/world_coord", 1, objectPosition_Callback);
+    ros::Subscriber sub_position = n.subscribe("camera/world_coord", 1, objectPosition_Callback);
+    ros::Subscriber sub_detection = n.subscribe("/tf/start_calc", 1, objectDetection_Callback);
   
    //we'll transform a point once every second
    ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener)));

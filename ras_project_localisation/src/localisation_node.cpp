@@ -27,8 +27,6 @@ class ParticleFilter
         std::normal_distribution<double> ang_noise;
         std::vector<Line> map;
         void initiateParticles( int nParticles);
-        sensor_msgs::LaserScan fakeScan(const geometry_msgs::Point32 &p,
-                                        float angle, int n_rays);
         ros::Subscriber laser_sub;
         ros::Publisher location_pub;
         double lidar_displ_x;
@@ -37,19 +35,20 @@ class ParticleFilter
         
     public:
       
-        tf::TransformListener listener;
-        void update_lastPose();
-        geometry_msgs::PoseStamped lastPose;
-        sensor_msgs::LaserScan latest_scan;
-        bool hasScan;
-        sensor_msgs::PointCloud particles;
-        std::vector<float> rayTrace(const geometry_msgs::Point32 &pos,
-                                    float angle,
-                                    const std::vector<float> &angles);
         ParticleFilter(geometry_msgs::PoseStamped initialPose,
                        int _nParticles,
                        int _nScans,
                        std::vector<Line> _map);
+        void update_lastPose();
+        tf::TransformListener listener;
+        geometry_msgs::PoseStamped lastPose;
+        sensor_msgs::LaserScan latest_scan;
+        bool hasScan;
+        sensor_msgs::PointCloud particles;
+
+        std::vector<float> rayTrace(const geometry_msgs::Point32 &pos,
+                                    float angle,
+                                    const std::vector<float> &angles);
         void update_particles_position(ros::Time t);
         void update_particles_weight();
         void resample_particles();
@@ -123,6 +122,7 @@ void ParticleFilter::initiateParticles( int nParticles)
 void ParticleFilter::resample_particles()
 {
     double wSum = 0;
+
     std::vector<float> weights(nParticles);
     std::vector<geometry_msgs::Point32> newPs(nParticles); 
     std:: vector<sensor_msgs::ChannelFloat32> newCh(nParticles);
@@ -134,6 +134,7 @@ void ParticleFilter::resample_particles()
     {
         wSum +=exp(particles.channels[i].values[1]);
     }
+
     for ( int i = 0; i < nParticles; i++)
     {
         weights[i] = exp(particles.channels[i].values[1])/wSum;
@@ -185,7 +186,6 @@ void ParticleFilter::update_particles_position(ros::Time t)
     {
         ROS_INFO("particle update failed");
         std::cout << ex.what() << "\n";
-        lastPose.header.stamp = ros::Time::now();
     }
     for ( int i = 0; i < nParticles; i++)
     {
@@ -195,7 +195,7 @@ void ParticleFilter::update_particles_position(ros::Time t)
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
-        omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
+        //omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
         particles.points[i].x += cos(omega_n)*vt + vt*(float)vel_noise(rng)*cos(omega_n);
         particles.points[i].y += sin(omega_n)*vt + vt*(float)vel_noise(rng)*sin(omega_n);
     }
@@ -394,7 +394,7 @@ int main(int argc, char*argv[])
     
     ParticleFilter pf(pp, 1000,16, map);   
 
-    ros::Rate rate(100);
+    ros::Rate rate(10);
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();
