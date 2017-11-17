@@ -8,8 +8,9 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-double lin_vel_;
-double ang_vel_;
+static double lin_vel_;
+static double ang_vel_;
+float objDistance;
 double alpha_left, beta_left, proportion_left;
 double alpha_right, beta_right, proportion_right;
 
@@ -33,8 +34,6 @@ class EncoderListener
         EncoderListener( ros::NodeHandle& n_);
         void LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
         void RightEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
-
-
 };
 
 EncoderListener::EncoderListener( ros::NodeHandle& n_ )
@@ -97,12 +96,24 @@ void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
     ang_vel_ = msg->angular.z;
 }
 
+void objPositionMoveCallback(const std_msgs::Float32::ConstPtr& msg)
+{
+    objDistance = msg->data;
+    if (0.0 != objDistance)
+    {
+        lin_vel_ = 0.1;
+        ang_vel_ = 0.0;
+        ROS_INFO("Robot is moving closer to the object");
+    }
+}
+
 int main (int argc, char **argv)
 {
     ros::init(argc, argv, "motor_controller");
     ros::NodeHandle n_;
     //ros::Subscriber twist_sub;
     ros::Subscriber teleop_sub;
+    ros::Subscriber obj_position_move_sub;
     ros::Publisher vel_left_pub;
     ros::Publisher vel_right_pub;
     ros::Publisher est_vel_pub;
@@ -110,6 +121,7 @@ int main (int argc, char **argv)
     EncoderListener listener = EncoderListener(n_);
 
     teleop_sub = n_.subscribe("motor_teleop/twist", 10, teleopCallback);
+    obj_position_move_sub = n_.subscribe("/motorController/moveToObj", 1, objPositionMoveCallback);
     vel_left_pub = n_.advertise<std_msgs::Float32>("left_motor/cmd_vel", 10);
     vel_right_pub = n_.advertise<std_msgs::Float32>("right_motor/cmd_vel", 10);
     est_vel_pub = n_.advertise<geometry_msgs::Twist>("est_robot_vel/twist", 10);
