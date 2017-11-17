@@ -30,19 +30,18 @@ class PathFollowing
    	//Tolerance for angular error and distance error
    	double theta_error, distance_error;
 
-	double v_prev; //previous velocity
 	public:
 		PathFollowing() : angle_ok(0), distance_ok(0), updated(false)
 	{
-		theta_error = 0.05;
-		distance_error = 0.01;
-		v_min = 0.01; //from previous value
-		v_max = 0.2; // non tested 0.3 m/s
-		vGain = 1; // 
+		theta_error = 0.1; //0.05
+		distance_error = 0.01; //0.01
+		v_min = 0.1; //0.01
+		v_max = 0.5; // 0.2
+		vGain = 0.5; //  1
 
-		w_min = 0.1; // previosu was 0.5, testing 0.4
-		w_max = 0.6; // previous was 06
-		wGain = 0.4; // from the fact that pi = 3.14 , pi*0.2 = 0.628 roughly
+		w_min = 0.1; // 0.1
+		w_max = 1.0; // 0.6
+		wGain = 1.5; // 0.4
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();
     		teleop_sub = n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
@@ -74,6 +73,7 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    double y_current = robot_pose.pose.position.y;
    double x_desired = poses.poses[current_pose].position.x;
    double x_current = robot_pose.pose.position.x;
+   double final_pose= poses.poses[current_pose].orientation.z; // Z NOT QUATERINO, ITS YAW
    double theta = atan2(y_desired-y_current, x_desired-x_current);
    double roll,pitch,yaw;
    tf::Quaternion q(robot_pose.pose.orientation.x, robot_pose.pose.orientation.y, robot_pose.pose.orientation.z ,robot_pose.pose.orientation.w);
@@ -86,12 +86,11 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    double distance = std::sqrt(std::pow(x_current-x_desired,2)+std::pow(poses.poses[current_pose].position.y-robot_pose.pose.position.y,2));
 
 
-// 
-   //if (std::abs(desired_angle) < 0.05 || distance <= 0.01) {
 
    //If ONE of the error (or both) is BELOW the treshhold error
   //if (std::abs(desired_angle) < theta_error || distance <= distance_error) {
   //With the above logic the pose is not determined upon end position!
+  //
   if (std::abs(desired_angle) < theta_error  || distance <= distance_error) {
 
 
@@ -100,7 +99,6 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 
 	    move.linear.x = std::max(std::min(v_max,vGain*distance),v_min);
 	    move.angular.z = 0; // Straight movement
-	    v_prev = move.linear.x;
 	    motor_pub.publish(move);
 	    ROS_INFO("%f",distance);
 	}
@@ -108,12 +106,21 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	else {
 	    move.linear.x = 0;
 	    move.angular.z = 0;
-	    v_prev = move.linear.x;
-	    motor_pub.publish(move);
 	    if (current_pose != nb_poses-1)
 	    	current_pose++;
-            else updated = false;
-	}
+            else {
+		    desired_angle = fmod(final_pose-theta_current,M_PI);		
+	    	    if (desired_angle > 0)
+	    		move.angular.z = std::max(std::min(w_max,wGain*desired_angle),w_min);
+	    	    else
+			move.angular.z = std::min(std::max(wGain*desired_angle,-1*w_max), -1*w_min);
+		    
+		    if(std::abs(desired_angle) < theta_error)
+		   	{ move.angular.z=0; updated = false; }
+
+	    	 }	
+	    motor_pub.publish(move);
+         }
    }
    else {
 	move.linear.x = 0; // the zero can give a hickup movement..
