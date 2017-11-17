@@ -19,16 +19,18 @@ class OdometryNode
         tf::Quaternion q;
         ros::Time time;
         ros::Time time_imu;
+        double current_v, current_w;
         double current_x, current_y, current_omega;
-	float speed_x, speed_y, speed_omega;
+	    float speed_x, speed_y, speed_omega;
         float imu_x, imu_y, imu_omega;
-	float offset_x, offset_y;
+	    float offset_x, offset_y;
 
     public:
         OdometryNode() 
         {
             time = ros::Time::now();
             current_x = current_y = 0;
+            current_v = current_w = 0;
 	        current_omega = PI/2;
             imu_x = imu_y = imu_omega = 0;
 	        offset_x = offset_y = 0;
@@ -38,19 +40,24 @@ class OdometryNode
 	    odom_pub = n_.advertise<geometry_msgs::PoseStamped>("robot/pose", 1000);
         }
         void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
+        void UpdatePosition();
         void IMUCallback(const sensor_msgs::Imu::ConstPtr& msg);
 };
 
 void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
 {
+    current_v = msg->linear.x;
+    current_w = msg->angular.z;
+}
+
+void OdometryNode::UpdatePosition()
+{
     ros::Time current_time = ros::Time::now();
     double dt = (current_time - time).toSec();
     time = current_time;
-    double v = msg->linear.x; 
-    double omega = msg->angular.z; 
-    current_x = current_x + cos(current_omega)*v*dt;
-    current_y = current_y + sin(current_omega)*v*dt;
-    current_omega = current_omega + omega*dt;
+    current_x = current_x + cos(current_omega)*current_v*dt;
+    current_y = current_y + sin(current_omega)*current_v*dt;
+    current_omega = current_omega + current_w*dt;
     if (current_omega > PI) {
 	current_omega = fmod(current_omega,PI)-PI;
     }
@@ -104,6 +111,10 @@ void OdometryNode::IMUCallback(const sensor_msgs::Imu::ConstPtr& msg)
 int main(int argc, char ** argv){
     ros::init(argc, argv, "odometry");
     OdometryNode on  = OdometryNode();
-    ros::spin();
+    while(ros::ok())
+    {
+        ros::spinOnce();
+        on.UpdatePosition();
+    }
     return 0;
 }
