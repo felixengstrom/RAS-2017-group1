@@ -63,7 +63,6 @@ void OdometryNode::UpdatePosition()
     }
     if (current_omega < -PI)
 	current_omega = fmod(current_omega,PI)+PI;
-    ROS_INFO("x:%f y:%f, omega:%f", current_x, current_y, current_omega);
     geometry_msgs::PoseStamped pose;
     pose.pose.position.x = current_x;
     pose.pose.position.y = current_y;
@@ -111,10 +110,12 @@ void OdometryNode::IMUCallback(const sensor_msgs::Imu::ConstPtr& msg)
 int main(int argc, char ** argv){
     ros::init(argc, argv, "odometry");
     OdometryNode on  = OdometryNode();
+    ros::Rate rate(100);
     while(ros::ok())
     {
         ros::spinOnce();
         on.UpdatePosition();
+        rate.sleep();
     }
     return 0;
 }
