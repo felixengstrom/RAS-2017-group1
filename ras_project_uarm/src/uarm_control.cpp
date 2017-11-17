@@ -1,7 +1,7 @@
 #include <math.h>
 #include <ros/ros.h>
 #include "uarm/Pump.h"
-#include <std_msgs/Int32.h>
+#include <std_msgs/Bool.h>
 #include "uarm/MoveToJoints.h"
 #include "tf/transform_listener.h"
 #include <geometry_msgs/PointStamped.h>
@@ -29,6 +29,7 @@ class UarmController{
     private:
         double j0_start, j1_start, j2_start, j3_start;
         double d0, d1, d2, d3, d4, d5;
+        double x_start, y_start, z_start;
         std::string arm_frame;
         tf::TransformListener tf_;
         ros::NodeHandle n;
@@ -44,8 +45,9 @@ class UarmController{
         void moveToPointCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
         bool moveToPointService(ras_project_uarm::MoveArmCartesian::Request &req, 
                                 ras_project_uarm::MoveArmCartesian::Response &res);
-        void engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg);
+        void engageSuctionCallback(const std_msgs::Bool::ConstPtr& msg);
         AngleSetting invKinematic(double x,double y,double z);
+        void goTo_startPosition();
 };
 
 UarmController::UarmController() : tf_()
@@ -77,6 +79,14 @@ UarmController::UarmController() : tf_()
     n_.getParam("d3", d3);
     n_.getParam("d4", d4);
     n_.getParam("d5", d5);
+
+    x_start = 0.15;
+    y_start = 0.0;
+    z_start = 0.15;
+
+    n_.getParam("x_start", x_start);
+    n_.getParam("y_start", y_start);
+    n_.getParam("z_start", z_start);
     
     arm_frame = "uarm_base";
     
@@ -120,23 +130,11 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
                         ras_project_uarm::MoveArmCartesian::Response &res)
 {
     bool success = false;
-    /*geometry_msgs::PointStamped point_robot_frame;
-
-    try
-    {
-        tf_.transformPoint(arm_frame, req.point, point_robot_frame);
-    }
-    catch (tf::TransformException &ex) 
-    {
-        ROS_INFO("Could not get transformation to perform moveToPointCallback");
-        res.error = not(success);
-        return success;
-    }*/
 
     float x = req.point.point.x;
     float y = req.point.point.y;
     float z = req.point.point.z;
-
+    z += 2.0;
     ROS_INFO("x:%f, y:%f, z:%f", x, y, z);
     
 
@@ -145,10 +143,10 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
         ROS_INFO("Move not allowed, to close to robot");
     } else
     {
-        bool success =this->moveArm(x,y,z);
+        success =this->moveArm(x,y,z);
     }
-
     res.error = not(success);
+
     return success;
 }
 
@@ -184,7 +182,7 @@ AngleSetting UarmController::invKinematic(double x,double y,double z)
     return angs;
 }
 
-void UarmController::engageSuctionCallback(const std_msgs::Int32::ConstPtr& msg)
+void UarmController::engageSuctionCallback(const std_msgs::Bool::ConstPtr& msg)
 {
     if (msg->data == 1)
     {
@@ -214,6 +212,11 @@ bool UarmController::moveArm(double x, double y, double z)
     return success;
 }
 
+void UarmController::goTo_startPosition()
+{
+    this->moveArm(x_start,y_start,z_start);
+}
+
 int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "uarm_control");
@@ -225,17 +228,18 @@ int main(int argc, char* argv[])
 
   nh.getParam("waitForArm", waitForArm);
 
-  double x_start = 0.15;
+/*  double x_start = 0.15;
   double y_start = 0.0;
   double z_start = 0.15;
 
   nh.getParam("x_start", x_start);
   nh.getParam("y_start", y_start);
-  nh.getParam("z_start", z_start);
+  nh.getParam("z_start", z_start);*/
 
   bool uarm_started = ros::service::waitForService("/uarm/move_to_joints", 5000);
   if (uarm_started){
-    uc.moveArm(x_start,y_start,z_start);
+      uc.goTo_startPosition();
+    //uc.moveArm(x_start,y_start,z_start);
   } else { 
       ROS_INFO("No uarm service running");
   }
