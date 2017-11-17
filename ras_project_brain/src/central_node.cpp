@@ -6,6 +6,11 @@
 #include <tf/transform_listener.h>
 #include <string>
 
+#define INITIAL_STATE 0
+#define OBJ_DETECTION_STATE 1
+#define MOVING_TO_POSITION_STATE 2
+#define OBJ_PICKUP_STATE 3
+
 
 class CentralNode
 {
@@ -15,6 +20,8 @@ public:
     ros::Publisher objectDetection_publisher;
     ros::Publisher objectPosition_publisher;
     ros::Publisher arm_engageSuction_publisher;
+    ros::Publisher objectCoordinateCalc_publisher;
+    ros::Publisher tf_PickUp_publisher;
     ros::Subscriber objectDetection_subscriber;
     tf::TransformListener listener;
 
@@ -26,11 +33,12 @@ public:
         start_coordCalc = 0;
         object_x_position = 0.0;
         engage_suction = 0;
+        current_state = INITIAL_STATE;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 1);
         objectPosition_publisher = n.advertise<std_msgs::Float32>("/motorController/moveToObj", 1);
         arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("uarm/engageSuction",1);
-        /*Needed only if x,y,z are being published randomly by the camera even when the object is not detected, else it can be removed
-        objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);*/
+        objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);
+        tf_PickUp_publisher = n.advertise<std_msgs::Bool>("/tf/pickup_obj", 1);
         objectDetection_subscriber = n.subscribe("/camera/image/object_detected", 1, &CentralNode::objectDetectionCallback, this);
     }
 
@@ -44,72 +52,103 @@ public:
         object_detected = msg->data;
     }
 
-    void pDetectionConvey()
+    void pObjDetectionStateMachine()
     {
-        /*Object_detected flag has been introduced to make sure that eSpeak is triggered
-         * only once despite a periodic publish from the camera on object detection*/
-        if(1 == object_detected && 1 == object_detected_flag)
+        tf::StampedTransform transform;
+        switch (current_state)
         {
-             /*Sending "Object found" string to speaker*/
-             std::string detectionString("Object found");
-             msg_eSpeak_string.data = detectionString;
-             objectDetection_publisher.publish(msg_eSpeak_string);
-             object_detected_flag = 0;
-             /*Needed only if x,y,z are being published randomly by the camera even when the object is not detected, else it can be removed*/
-             start_coordCalc = 1;
-             /*msg_tfObjCalc_bool.data = start_coordCalc;
-             objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);*/
+        case INITIAL_STATE:
+            if (1 == object_detected)
+            {
+                current_state = OBJ_DETECTION_STATE;
+                previous_state = INITIAL_STATE;
+                /*Send "Object found" string to speaker*/
+                if (1 == object_detected_flag)
+                {
+                    std::string detectionString("Object found");
+                    msg_eSpeak_string.data = detectionString;
+                    objectDetection_publisher.publish(msg_eSpeak_string);
+                    object_detected_flag = 0;
+                }
+                /*Start the calculation of object coordinates wrt robot*/
+                start_coordCalc = 1;
+                msg_tfObjCalc_bool.data = start_coordCalc;
+                objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);
+            }
+            break;
+        case OBJ_DETECTION_STATE:
+            if(INITIAL_STATE == previous_state)
+            {
+                current_state = MOVING_TO_POSITION_STATE;
+                previous_state = OBJ_DETECTION_STATE;
+                ROS_INFO("%d",start_coordCalc);
+                do{
+                    try
+                    {
+                        listener.waitForTransform("robot","object",ros::Time(0), ros::Duration(2));
+                        listener.lookupTransform("robot","object",ros::Time(0), transform);
+                    }
+                    catch(tf::TransformException &ex)
+                    {
+                         ROS_ERROR("%s",ex.what());
+                    }
+                    object_x_position = transform.getOrigin().x();
+                    diff_distance = object_x_position - 0.26;
+                    ROS_INFO("Difference calculated --> %0.2f",diff_distance);
+                    if (diff_distance<-0.03 || diff_distance>0.03)
+                    {
+                        msg_odomDiffDist_float.data = diff_distance;
+                    }
+                    else
+                    {
+                        msg_odomDiffDist_float.data = 0.0;
+                    }
+                    objectPosition_publisher.publish(msg_odomDiffDist_float);
+                  }while(diff_distance<-0.03 || diff_distance>0.03);
+            }
+            break;
+        case MOVING_TO_POSITION_STATE:
+            if(OBJ_DETECTION_STATE == previous_state)
+            {
+                current_state = OBJ_PICKUP_STATE;
+                previous_state = MOVING_TO_POSITION_STATE;
+                engage_suction = 1;
+                pickup_object = 1;
+                /*arm related messages are published here
+                 * 1. To start suction
+                 * 2. To request the arm to move to the desired x,y,z coordinate*/
+                msg_uarm_engageSuction_bool.data = engage_suction;
+                msg_tfPickUpObj_bool.data = pickup_object;
+                tf_PickUp_publisher.publish(msg_tfPickUpObj_bool);
+                arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
+            }
+            break;
+        case OBJ_PICKUP_STATE:
+            if (MOVING_TO_POSITION_STATE == previous_state)
+            {
+                current_state = INITIAL_STATE;
+                previous_state = OBJ_PICKUP_STATE;
+                engage_suction = 0;
+                start_coordCalc = 0;
+                pickup_object = 0;
+                object_detected_flag = 1;
+                msg_tfObjCalc_bool.data = start_coordCalc;
+                msg_uarm_engageSuction_bool.data = engage_suction;
+                tf_PickUp_publisher.publish(msg_tfPickUpObj_bool);
+                arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
+                objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);
+            }
+            break;
         }
-        else if(0 == object_detected)
-        {
-            start_coordCalc = 0;
-            /*This flag might have to be updated after the object is picked up*/
-            object_detected_flag = 1;
-        }
-    }
-
-    /*Check if the object lies in the optimal position*/
-    void pCoordCalculation()
-    {
-       tf::StampedTransform transform;
-       ROS_INFO("%d",start_coordCalc);
-       if(1 == start_coordCalc)
-       {
-          try
-           {
-               listener.waitForTransform("robot","object",ros::Time(0), ros::Duration(2));
-               listener.lookupTransform("robot","object",ros::Time(0), transform);
-           }
-           catch(tf::TransformException &ex)
-           {
-               ROS_ERROR("%s",ex.what());
-           }
-           object_x_position = transform.getOrigin().x();
-           /*******Convert into cm and put the exact values********/
-           diff_distance = object_x_position - 0.26;
-           ROS_INFO("Difference calculated --> %0.2f",diff_distance);
-           if(diff_distance<-0.03 || diff_distance>0.03)
-           {
-               msg_odomDiffDist_float.data = diff_distance;
-           }
-           else
-           {
-               engage_suction = 1;
-               msg_odomDiffDist_float.data = 0.0;
-
-           }
-           msg_uarm_engageSuction_bool.data = engage_suction;
-           objectPosition_publisher.publish(msg_odomDiffDist_float);
-           arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
-       }
     }
 
 private:
     bool object_detected,object_detected_flag;
-    bool start_coordCalc, engage_suction;
+    bool start_coordCalc, engage_suction, pickup_object;
+    int current_state, previous_state;
     float object_x_position, diff_distance;
     std_msgs::String msg_eSpeak_string;
-    std_msgs::Bool msg_tfObjCalc_bool,msg_uarm_engageSuction_bool;
+    std_msgs::Bool msg_tfObjCalc_bool,msg_uarm_engageSuction_bool,msg_tfPickUpObj_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
 };
 
@@ -125,8 +164,7 @@ int main(int argc, char **argv)
 
   while (central_node.n.ok())
   {
-    central_node.pDetectionConvey();
-    central_node.pCoordCalculation();
+    central_node.pObjDetectionStateMachine();
     ros::spinOnce();
     loop_rate.sleep();
   }
