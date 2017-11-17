@@ -42,7 +42,7 @@ class PathFollowing
 
 		w_min = 0.1; // previosu was 0.5, testing 0.4
 		w_max = 0.6; // previous was 06
-		wGain = 0.4; // from the fact that pi = 3.14 , pi*0.2 = 0.628 roughly
+		wGain = 0.6; // from the fact that pi = 3.14 , pi*0.2 = 0.628 roughly
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();
     		teleop_sub = n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
@@ -120,9 +120,9 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	//if (distance > distance_error) {move.linear.x =v_min/2;	  v_prev = move.linear.x; }  
 	//else {move.linear.x = 0;v_prev = move.linear.x;}
 	    if (desired_angle > 0)
-	    	move.angular.z = std::max(std::min(w_max,wGain*desired_angle),w_min);
+	    	move.angular.z = std::max(std::min(w_max,wGain*atan(desired_angle)),w_min);
 	    else
-		move.angular.z = std::min(std::max(wGain*desired_angle,-1*w_max), -1*w_min);
+		move.angular.z = std::min(std::max(wGain*atan(desired_angle),-1*w_max), -1*w_min);
 	}
 	ROS_INFO("%f ; %f", desired_angle, distance);
 	motor_pub.publish(move);

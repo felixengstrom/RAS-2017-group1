@@ -2,6 +2,10 @@
 
 <!-- include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch)" -->
 
+<!-- <node pkg="ras_project_camera" name="camera_pcl" type="detection" output="screen"> 
+<param name="min_object_size" type="int" value="30" />
+</node> -->
+
 <node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen">
 <param name="green_h_max" type="int" value="75"/>
 <param name="green_s_max" type="int" value="255"/>
@@ -26,7 +30,7 @@
 
 <param name="morph" type="int" value="10"/>
 <param name="nb_of_colors" type="int" value="2"/>
-<param name="minTargetRadius" type="int" value="20"/>
+<param name="minTargetRadius" type="int" value="50"/>
 <param name="maxTargetRadius" type="int" value="200"/>
 </node>
 

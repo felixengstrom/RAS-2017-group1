@@ -29,8 +29,8 @@ public:
   camera_pcl()
   {
     sub = nh.subscribe ("/camera/depth_registered/points", 1, &camera_pcl::cloud_cb, this);
-    sub_object_coord = nh.subscribe("/camera/image/object_coord", 1, &camera_pcl::object_coord_cb, this);
-    pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/world_coord", 1);;
+    sub_object_coord = nh.subscribe("/camera/image/object_coord", 100, &camera_pcl::object_coord_cb, this);
+    pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/world_coord", 100);
     pub_pcl_filtered = nh.advertise<sensor_msgs::PointCloud2> ("camera/pcl_filtered", 1);
   }
 
@@ -38,7 +38,7 @@ public:
   {
     pixel_x = object_coord_msg->x;
     pixel_y = object_coord_msg->y;
-    //std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
+    std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
   }
 
   void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
@@ -59,8 +59,9 @@ public:
   int height = point_pcl.height;
 
   pcl_index = pixel_y*width + pixel_x;
-  ROS_INFO("pcl_index: %i", pcl_index);
+  //ROS_INFO("pcl_index: %i", pcl_index);
   pcl::PointXYZ p = point_pcl.at(pcl_index);
+  ROS_INFO("after at index");
   //in case p consist NaN
   int dx[] = {0,1,0,-1};
   int dy[] = {1,0,-1,0};
@@ -75,7 +76,7 @@ public:
 {
   pcl_index = (pixel_y+dy[i])*width + (pixel_x+dx[i]);
   p = point_pcl.at(pcl_index);
-  //std::cerr << "pcl_index " << pcl_index << std::endl;
+  std::cerr << "value was non " << std::endl;
 } 
   
   float x, y, d, z;

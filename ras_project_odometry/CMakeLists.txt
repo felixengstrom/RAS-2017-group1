@@ -6,7 +6,9 @@ project(ras_project_odometry)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-catkin_package()
+catkin_package(
+	CATKIN_DEPENDS
+	phidgets)
 ## is used, also find other catkin packages
 include_directories(
     # include
@@ -18,6 +20,7 @@ find_package(catkin REQUIRED
              std_msgs
              tf
              phidgets)
-
+# add_dependencies(
 add_executable(odometry_node src/odometry.cpp)
-target_link_libraries(odometry_node ${catkin_LIBRARIES}) 
+target_link_libraries(odometry_node ${catkin_LIBRARIES})
+
