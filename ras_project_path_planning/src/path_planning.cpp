@@ -52,7 +52,7 @@ class PathPlanning
 		int width_height;
 		std::vector<int8_t> Csp;
 		//constant
-		static const double r=0.274/2; //radius of robot
+		static const double r=0.29/2; //0.274/2; //radius of robot
 		int cells; // amount of cells to be filled from a point
 
 		//Path Planning
@@ -66,7 +66,7 @@ class PathPlanning
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(1), Wall_cost(10),Wall_tolerance(0)
+		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 		n = ros::NodeHandle();

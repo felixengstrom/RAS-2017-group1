@@ -101,7 +101,7 @@ void objPositionMoveCallback(const std_msgs::Float32::ConstPtr& msg)
     objDistance = msg->data;
     if (0.0 != objDistance)
     {
-        lin_vel_ = 0.1;
+        lin_vel_ = 0.06;
         ang_vel_ = 0.0;
         ROS_INFO("Robot is moving closer to the object");
     }

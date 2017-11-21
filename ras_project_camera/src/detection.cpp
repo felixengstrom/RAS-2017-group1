@@ -16,25 +16,33 @@
 #include <pcl/filters/passthrough.h>
 #include <iostream>
 #include <math.h>
-class camera_pcl
+#include <ctime>
+
+
+struct timespec start, finish;
+double elapsed;
+
+class detection
 {
   ros::NodeHandle nh;
   ros::Subscriber sub;
-  ros::Publisher object_flag_pub;
+  ros::Publisher detected_pub;
   //ros::Publisher pub_world_coord;
   ros::Publisher pub_pcl_filtered;
   int pixel_x, pixel_y, pcl_index;
   int min_object_size;
 
 public:
-  camera_pcl()
+  detection()
   {
-    sub = nh.subscribe ("/camera/depth/points", 1, &camera_pcl::cloud_cb, this);
-    object_flag_pub = nh.advertise<std_msgs::Bool>("/camera/object_detected",1);
+    sub = nh.subscribe ("/camera/depth/points", 1, &detection::cloud_cb, this);
+    detected_pub = nh.advertise<std_msgs::Bool>("/camera/detected",1);
     //pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/world_coord", 1);;
     pub_pcl_filtered = nh.advertise<sensor_msgs::PointCloud2> ("camera/pcl_filtered", 1);
+    
     ros::NodeHandle nh("~");
     nh.getParam("min_object_size",min_object_size);
+    
   }
 
   void object_coord_cb (const geometry_msgs::Point::ConstPtr& object_coord_msg)
@@ -43,64 +51,61 @@ public:
     pixel_y = object_coord_msg->y;
     //std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
   }
+  
   void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
   {
-  
-  //Create container for original and filtered data
+    //Create container for original and filtered data
   pcl::PCLPointCloud2* cloud_blob = new pcl::PCLPointCloud2;
   pcl::PCLPointCloud2ConstPtr cloudPtr(cloud_blob);
   pcl::PCLPointCloud2 cloud_filtered_vox;
+  pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_ (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PassThrough<pcl::PointXYZ> pass;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_p (new pcl::PointCloud<pcl::PointXYZ>), cloud_f (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+  pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
+  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  pcl::ExtractIndices<pcl::PointXYZ> extract;
+
+  ros::Rate loop_rate(5);
+      while (ros::ok())
+      {
+        clock_gettime(CLOCK_MONOTONIC, &start);
+  
   // Convert msg to PCL data type
   pcl_conversions::toPCL(*cloud_msg, *cloud_blob);
-  //std::cerr << "PointCloud before filtering: " << cloud_blob->width * cloud_blob->height << " data points." << std::endl;
-  ROS_INFO("Subscribed for Point Cloud");
+  //ROS_INFO("Subscribed for Point Cloud");
   // Perform the VoxelGrid filtering
-  pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
   vox.setInputCloud (cloudPtr);
   vox.setLeafSize (0.005, 0.005, 0.005); //.002
   vox.filter (cloud_filtered_vox);
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_ (new pcl::PointCloud<pcl::PointXYZ>);
 
   // Convert to the templated PointCloud
   pcl::fromPCLPointCloud2 (cloud_filtered_vox, *cloud_filtered_);
 
   // Perform the Pass through filtering to limit z axis
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z (new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud (cloud_filtered_);
   pass.setFilterFieldName ("z");
   pass.setFilterLimits (0.0, 0.5);
   //pass.setFilterLimitsNegative (true);
   pass.filter (*cloud_filtered_z);
 
-
   // Create the statistical outlier removal filtering object
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
   sor.setInputCloud (cloud_filtered_z);
   sor.setMeanK (50); //150 for 0.002 50 for 0.005 voxel grid
-  sor.setStddevMulThresh (0.005); //0.001
+  sor.setStddevMulThresh (0.001); //0.001
   sor.filter (*cloud_filtered);
 
-  //Create container for segmented data
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_p (new pcl::PointCloud<pcl::PointXYZ>), cloud_f (new pcl::PointCloud<pcl::PointXYZ>);
-
   // RANSAC
-  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-  pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
-
-  // Create the segmentation object
-  pcl::SACSegmentation<pcl::PointXYZ> seg;
   // Optional
   seg.setOptimizeCoefficients (true);
   // Mandatory
   seg.setModelType (pcl::SACMODEL_PLANE);
   seg.setMethodType (pcl::SAC_RANSAC);
   seg.setDistanceThreshold (0.01);
-
-  // Create the filtering object
-  pcl::ExtractIndices<pcl::PointXYZ> extract;
 
   int i = 0, nr_points = (int) cloud_filtered->points.size ();
   // While 30% of the original cloud is still there
@@ -132,12 +137,12 @@ public:
   ROS_INFO("Object size: %d", object_size);
   ROS_INFO("Min object size: %d", min_object_size);
 
-  std_msgs::Bool object_flag;
+  std_msgs::Bool detected;
   if (object_size > min_object_size ) //&& object_size < min_object_size
  {
-  ROS_INFO("Object detected!");
-  object_flag.data = 1;
-  object_flag_pub.publish(object_flag);
+  ROS_INFO("Something on the way!");
+  detected.data = 1;
+  detected_pub.publish(detected);
 
   /*float x_points = 0.0;
   float y_points = 0.0;
@@ -169,26 +174,29 @@ public:
   }
   else 
   {
-    object_flag.data = 0;
-    object_flag_pub.publish(object_flag);
+    detected.data = 0;
+    detected_pub.publish(detected);
   }
 
   sensor_msgs::PointCloud2 output;
   pcl::toROSMsg(*cloud_filtered, output);
   pub_pcl_filtered.publish (output);
-
+  clock_gettime(CLOCK_MONOTONIC, &finish);
+  elapsed = (finish.tv_sec - start.tv_sec);
+  elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+  std::cerr << "time of one loop "<< elapsed << std::endl;
+  loop_rate.sleep();
+  ros::spinOnce();
   }
-
+}
 };
 
 
 int main (int argc, char** argv)
 {
   // Initialize ROS
-  ros::init (argc, argv, "camera_pcl");
-  camera_pcl ic;
-
-  // Spin
+  ros::init (argc, argv, "detection");
+  detection ic;
   ros::spin ();
   return 0;
 }

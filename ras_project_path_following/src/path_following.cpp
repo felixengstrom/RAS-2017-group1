@@ -36,12 +36,12 @@ class PathFollowing
 		theta_error = 0.1; //0.05
 		distance_error = 0.01; //0.01
 		v_min = 0.1; //0.01
-		v_max = 0.5; // 0.2
-		vGain = 0.5; //  1
+		v_max = 0.2; // 0.2
+		vGain = 0.3; //  1
 
 
 		w_min = 0.1; // previosu was 0.5, testing 0.4
-		w_max = 0.6; // previous was 06
+		w_max = 0.4; // previous was 06
 		wGain = 0.6; // from the fact that pi = 3.14 , pi*0.2 = 0.628 roughly
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();

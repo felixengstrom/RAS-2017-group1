@@ -98,7 +98,7 @@ UarmController::UarmController() : tf_()
     client2 = n.serviceClient<uarm::Pump>("/uarm/pump");
 
     sub = n.subscribe("uarm/moveToPose",1, &UarmController::moveToPointCallback, this);
-    sub2 = n.subscribe("uarm/engageSuction",1, &UarmController::engageSuctionCallback, this);
+    sub2 = n.subscribe("/uarm/engageSuction",1, &UarmController::engageSuctionCallback, this);
 }
 
 void UarmController::moveToPointCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
@@ -130,11 +130,10 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
                         ras_project_uarm::MoveArmCartesian::Response &res)
 {
     bool success = false;
-
     float x = req.point.point.x;
     float y = req.point.point.y;
     float z = req.point.point.z;
-    z += 2.0;
+    z += 0.02;
     ROS_INFO("x:%f, y:%f, z:%f", x, y, z);
     
 
@@ -144,9 +143,10 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
     } else
     {
         success =this->moveArm(x,y,z);
+        this->goTo_startPosition();
     }
-    res.error = not(success);
-
+    res.error = (!success);
+    ROS_INFO("success value: %d", success);
     return success;
 }
 
@@ -206,7 +206,7 @@ bool UarmController::moveArm(double x, double y, double z)
     srv.request.j2 = angs.j2;
     srv.request.j3 = j3_start;
     srv.request.interpolation_type = 2;
-    srv.request.movement_duration = ros::Duration(2,0);
+    srv.request.movement_duration = ros::Duration(1,0);
     bool success = client.call(srv);
     ROS_INFO("call made to uarm service");
     return success;
