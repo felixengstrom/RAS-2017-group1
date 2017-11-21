@@ -2,7 +2,9 @@
 #include "sensor_msgs/PointCloud.h"
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/Point.h"
+#include "geometry_msgs/Pose.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "tf/transform_listener.h"
 #include <iostream>
@@ -26,6 +28,7 @@ class WallAdder{
         std::vector<Line> map;
         ros::Subscriber sub;
         ros::Publisher pub;
+        ros::Publisher wall_pub;
         ros::Publisher vis_pub;
         ros::NodeHandle n;
         tf::TransformListener listener;
@@ -51,6 +54,7 @@ class WallAdder{
             lidar_displ_omega = tf::getYaw(transform.getRotation());
             sub = n.subscribe("/scan", 1, &WallAdder::scanCallback, this);
             pub = n.advertise<sensor_msgs::LaserScan>("wall_dists", 10);
+            wall_pub = n.advertise<geometry_msgs::PoseArray>("wall_add", 10);
             vis_pub = n.advertise<visualization_msgs::MarkerArray>( "updatedMap", 0 );
         };
         std::vector<float> rayTrace(float x, float y, float angle);
@@ -219,10 +223,30 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         line.y2 = y - y_disp 
                  - dists[lastMax]*sin(angle + lastMax * 2*PI/360 + lidar_displ_omega);
         map.push_back(line);
+
         ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
+
+        geometry_msgs::PoseArray pa;
+        geometry_msgs::Pose p1;
+        geometry_msgs::Pose p2;
+        p1.position.x = line.x1;
+        p1.position.y = line.y1;
+        p2.position.x = line.x2;
+        p2.position.y = line.y2;
+        std::vector<geometry_msgs::Pose> poses(2);
+        poses[0] = p1;
+        poses[1] = p2;
+        std_msgs::Header h;
+        h.frame_id = "map";
+        h.stamp = ros::Time::now();
+        pa.header = h;
+        pa.poses = poses;
+
+        wall_pub.publish(pa);
+
+        publishPOI(dists);
     }
 
-    publishPOI(dists);
 }
 
 std::vector<float> WallAdder::rayTrace(float x, float y, float angle)
