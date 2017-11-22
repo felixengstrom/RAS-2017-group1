@@ -211,6 +211,10 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 	if(tNow != t_update)
 	{
 	t_update=tNow;
+	//reset Csp
+	std::fill(Csp.begin(), Csp.end(), 0);
+	//Reset
+	path_list.clear(); // new map, new path needed (keep in mind its not a new goal)
 	std::vector<int8_t>OG=msg->data;
 	res=msg->info.resolution;
 	width_height=msg->info.width;

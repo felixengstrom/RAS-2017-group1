@@ -2,7 +2,9 @@
 #include "sensor_msgs/PointCloud.h"
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/Point.h"
+#include "geometry_msgs/Pose.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "tf/transform_listener.h"
 #include <iostream>
@@ -23,40 +25,54 @@ class WallAdder{
         float lidar_displ_x;
         float lidar_displ_y;
         float lidar_displ_omega;
+        float POImaxDist;
+        float POIminError;
+        int tolerance;
+        int minPOI;
         std::vector<Line> map;
         ros::Subscriber sub;
         ros::Publisher pub;
+        ros::Publisher wall_pub;
         ros::Publisher vis_pub;
         ros::NodeHandle n;
         tf::TransformListener listener;
         void publishPOI(std::vector<float> dists);
 
     public:
-        void publishMap();
-        WallAdder(std::vector<Line> map_): map(map_), n(), listener()
-        {
-            tf::StampedTransform transform;
-            try{
-                listener.waitForTransform("robot","laser",
-                                          ros::Time(0), ros::Duration(2));
-                listener.lookupTransform("robot","laser",
-                                         ros::Time(0), transform);
-            } catch(tf::TransformException &ex)
-            {
-                ROS_INFO("laser transform not found");
-            }
-
-            lidar_displ_x = transform.getOrigin().x();
-            lidar_displ_y = transform.getOrigin().y();
-            lidar_displ_omega = tf::getYaw(transform.getRotation());
-            sub = n.subscribe("/scan", 1, &WallAdder::scanCallback, this);
-            pub = n.advertise<sensor_msgs::LaserScan>("wall_dists", 10);
-            vis_pub = n.advertise<visualization_msgs::MarkerArray>( "updatedMap", 0 );
-        };
+        WallAdder(std::vector<Line> map_, float POImaxDist_,
+                  float POIminError_, int tolerance_, int minPOI_);
         std::vector<float> rayTrace(float x, float y, float angle);
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
 
 };
+
+WallAdder::WallAdder(std::vector<Line> map_,
+          float POImaxDist_,
+          float POIminError_,
+          int tolerance_,
+          int minPOI_):POImaxDist(POImaxDist_), POIminError(POIminError_),
+                       tolerance(tolerance_),minPOI(minPOI_), map(map_), n(),
+                       listener()
+{
+    tf::StampedTransform transform;
+    try{
+        listener.waitForTransform("robot","laser",
+                                  ros::Time(0), ros::Duration(2));
+        listener.lookupTransform("robot","laser",
+                                 ros::Time(0), transform);
+    } catch(tf::TransformException &ex)
+    {
+        ROS_INFO("laser transform not found");
+    }
+
+    lidar_displ_x = transform.getOrigin().x();
+    lidar_displ_y = transform.getOrigin().y();
+    lidar_displ_omega = tf::getYaw(transform.getRotation());
+    sub = n.subscribe("/scan", 1, &WallAdder::scanCallback, this);
+    pub = n.advertise<sensor_msgs::LaserScan>("wall_dists", 10);
+    wall_pub = n.advertise<geometry_msgs::PoseArray>("wall_add", 10);
+    vis_pub = n.advertise<visualization_msgs::MarkerArray>( "updatedMap", 0 );
+}
 void WallAdder::publishMap()
 {
     visualization_msgs::MarkerArray all_markers;
@@ -144,7 +160,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     for (int i  = 0; i< truey.ranges.size(); i++){
         double lidar_range = truey.ranges[i];
         double map_range = dists[i];
-        if (lidar_range<0.6 and std::abs(lidar_range - map_range)> 0.1 ) {
+        if (lidar_range < POImaxDist and std::abs(lidar_range - map_range) > POIminError ) {
             dists[i] = truey.ranges[i];
             pointsOfInterest[i] = 1;
         }else {
@@ -161,7 +177,6 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     int lastMax = 0;
     int count = 0;
     int countMax = 0;
-    int tolerance = 2;
     int tol = tolerance;
 
     for(int i = 0; i<pointsOfInterest.size(); i++)
@@ -205,7 +220,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     }
     ROS_INFO("countMax %d, firstMax %d, lastMax %d", countMax, firstMax, lastMax);
     // Calculate wall
-    if (countMax>30)
+    if (countMax>minPOI)
     {
         Line line;
         float x_disp = lidar_displ_x*cos(angle) - lidar_displ_y*sin(angle);
@@ -219,10 +234,30 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         line.y2 = y - y_disp 
                  - dists[lastMax]*sin(angle + lastMax * 2*PI/360 + lidar_displ_omega);
         map.push_back(line);
+
         ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
+
+        geometry_msgs::PoseArray pa;
+        geometry_msgs::Pose p1;
+        geometry_msgs::Pose p2;
+        p1.position.x = line.x1;
+        p1.position.y = line.y1;
+        p2.position.x = line.x2;
+        p2.position.y = line.y2;
+        std::vector<geometry_msgs::Pose> poses(2);
+        poses[0] = p1;
+        poses[1] = p2;
+        std_msgs::Header h;
+        h.frame_id = "map";
+        h.stamp = ros::Time::now();
+        pa.header = h;
+        pa.poses = poses;
+
+        wall_pub.publish(pa);
+
+        publishPOI(dists);
     }
 
-    publishPOI(dists);
 }
 
 std::vector<float> WallAdder::rayTrace(float x, float y, float angle)
@@ -317,7 +352,14 @@ int main(int argc, char*argv[])
     ROS_INFO_STREAM("Read "<<c<<" walls from map file.");
 
 
-    WallAdder wa(map);
+    float POImaxDist;
+    nh.param<float>("POImaxDist", POImaxDist, 0.6);
+    float POIminError;
+    nh.param<float>("POIminError", POIminError, 0.1);
+    int tolerance;
+    nh.param<int>("tolerance", tolerance, 2);
+
+    WallAdder wa(map, POImaxDist, POIminError, tolerance);
     ros::Rate rate(10);
     while(ros::ok())
     {
