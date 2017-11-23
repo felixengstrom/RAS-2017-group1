@@ -377,20 +377,25 @@ int main(int argc, char*argv[])
     ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
     ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("/localisation/pose", 10);
 
+
+    double x_start;
+    nh.param<double>("x_start", x_start, 0.22);
+    double y_start;
+    nh.param<double>("y_start", y_start, 0.22);
+    ROS_INFO("x_start %f, ystart %f", x_start, y_start);
+
     geometry_msgs::PoseStamped pp;
-    std_msgs::Header h;
-    h.frame_id = "map";
-    h.stamp = ros::Time::now();
-    pp.header = h;
-    geometry_msgs::Point p;
-    p.x = 0.22;
-    p.y = 0.22;
-    pp.pose.position = p;
-    geometry_msgs::Quaternion q;
-    float alpha = PI/2;
-    q.w = cos(alpha/2);
-    q.z = sin(alpha/2);
-    pp.pose.orientation = q;
+    pp.pose.position.x = x_start;
+    pp.pose.position.y = y_start;
+
+    pp.header.frame_id = "map";
+    pp.header.stamp = ros::Time::now();
+
+
+    double omega_start;
+    nh.param<double>("omega_start",omega_start, PI/2);
+    float alpha =omega_start;
+    pp.pose.orientation.z = sin(alpha/2);
     
     ParticleFilter pf(pp, 1000,16, map);   
 

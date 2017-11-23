@@ -39,6 +39,7 @@ class WallAdder{
         void publishPOI(std::vector<float> dists);
 
     public:
+        void publishMap();
         WallAdder(std::vector<Line> map_, float POImaxDist_,
                   float POIminError_, int tolerance_, int minPOI_);
         std::vector<float> rayTrace(float x, float y, float angle);
@@ -353,13 +354,15 @@ int main(int argc, char*argv[])
 
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.6);
+    nh.param<float>("POImaxDist", POImaxDist, 0.4);
     float POIminError;
-    nh.param<float>("POIminError", POIminError, 0.1);
+    nh.param<float>("POIminError", POIminError, 0.3);
     int tolerance;
     nh.param<int>("tolerance", tolerance, 2);
+    int minPOI;
+    nh.param<int>("minPOI", minPOI, 30);
 
-    WallAdder wa(map, POImaxDist, POIminError, tolerance);
+    WallAdder wa(map, POImaxDist, POIminError, tolerance, minPOI);
     ros::Rate rate(10);
     while(ros::ok())
     {
