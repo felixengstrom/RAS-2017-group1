@@ -382,7 +382,6 @@ int main(int argc, char*argv[])
     nh.param<double>("x_start", x_start, 0.22);
     double y_start;
     nh.param<double>("y_start", y_start, 0.22);
-    ROS_INFO("x_start %f, ystart %f", x_start, y_start);
 
     geometry_msgs::PoseStamped pp;
     pp.pose.position.x = x_start;
@@ -395,11 +394,13 @@ int main(int argc, char*argv[])
     double omega_start;
     nh.param<double>("omega_start",omega_start, PI/2);
     float alpha =omega_start;
+    pp.pose.orientation.w = cos(alpha/2);
     pp.pose.orientation.z = sin(alpha/2);
+    ROS_INFO("x_start %f, ystart %f, omega_start %f", x_start, y_start, omega_start);
     
     ParticleFilter pf(pp, 1000,16, map);   
 
-    ros::Rate rate(10);
+    ros::Rate rate(100);
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();
