@@ -54,7 +54,7 @@ class PathPlanning
 		bool initialized; // check if above values have been added!
 
 		//constant
-		static const double r=0.274/2; //radius of robot
+		static const double r=0.29/2; //0.274/2; //radius of robot
 		int cells; // amount of cells to be filled from a point
 
 		//Path Planning
@@ -68,7 +68,7 @@ class PathPlanning
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1), Wall_step(1), Wall_cost(10),Wall_tolerance(0)
+		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1), Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 			n = ros::NodeHandle();
@@ -146,7 +146,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	geometry_msgs::PoseArray following_points;
 	geometry_msgs::Pose arp;
 	arp.position.x=Q0; arp.position.y=W0;
-//	following_points.poses.push_back(arp); commented out because starting position is redundant, and fucks with path foloowing
+	following_points.poses.push_back(arp); //commented out because starting position is redundant, and fucks with path foloowing
 
 
 	//wall_marker is for rviz
@@ -166,6 +166,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	wall_marker.pose.position.y = 0;
 	geometry_msgs::Point pnt;
 	pnt.x=Q0; pnt.y=W0;
+	ROS_INFO_STREAM(" x = " << Q0 << " y = " << W0);
 	wall_marker.points.push_back(pnt);
 	for(int i=1;i<path_list.size();i++)
 	{

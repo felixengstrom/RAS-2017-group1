@@ -1,18 +1,19 @@
 <launch>
 
-<!-- include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch)" -->
+<include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch)" />
 
-<!-- <node pkg="ras_project_camera" name="camera_pcl" type="detection" output="screen"> 
+<node pkg="ras_project_camera" name="detection" type="detection" output="screen"> 
 <param name="min_object_size" type="int" value="30" />
-</node> -->
+<param name="min_obstacle_size" type="int" value="250" />
+</node>
 
-<node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen">
+<!--<node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen" cwd="node">
 <param name="green_h_max" type="int" value="75"/>
 <param name="green_s_max" type="int" value="255"/>
 <param name="green_v_max" type="int" value="255"/>
-<param name="green_h_min" type="int" value="35"/>
-<param name="green_s_min" type="int" value="80"/>
-<param name="green_v_min" type="int" value="50"/>
+<param name="green_h_min" type="int" value="40"/>
+<param name="green_s_min" type="int" value="30"/>
+<param name="green_v_min" type="int" value="30"/>
 
 <param name="blue_h_max" type="int" value="34"/>
 <param name="blue_s_max" type="int" value="255"/>
@@ -25,15 +26,49 @@
 <param name="yellow_s_max" type="int" value="255"/>
 <param name="yellow_v_max" type="int" value="255"/>
 <param name="yellow_h_min" type="int" value="80"/>
-<param name="yellow_s_min" type="int" value="40"/>
-<param name="yellow_v_min" type="int" value="40"/>
+<param name="yellow_s_min" type="int" value="30"/>
+<param name="yellow_v_min" type="int" value="20"/>
+
+<param name="red_h_max" type="int" value="135"/>
+<param name="red_s_max" type="int" value="245"/>
+<param name="red_v_max" type="int" value="240"/>
+<param name="red_h_min" type="int" value="115"/>
+<param name="red_s_min" type="int" value="50"/>
+<param name="red_v_min" type="int" value="50"/>
+
+<param name="purple_h_max" type="int" value="175"/>
+<param name="purple_s_max" type="int" value="245"/>
+<param name="purple_v_max" type="int" value="245"/>
+<param name="purple_h_min" type="int" value="130"/>
+<param name="purple_s_min" type="int" value="10"/>
+<param name="purple_v_min" type="int" value="10"/>
+
+<param name="orange_h_max" type="int" value="120"/>
+<param name="orange_s_max" type="int" value="245"/>
+<param name="orange_v_max" type="int" value="225"/>
+<param name="orange_h_min" type="int" value="90"/>
+<param name="orange_s_min" type="int" value="60"/>
+<param name="orange_v_min" type="int" value="60"/>
+
+<param name="obstacle_h_max" type="int" value="20"/>
+<param name="obstacle_s_max" type="int" value="250"/>
+<param name="obstacle_v_max" type="int" value="240"/>
+<param name="obstacle_h_min" type="int" value="0"/>
+<param name="obstacle_s_min" type="int" value="0"/>
+<param name="obstacle_v_min" type="int" value="0"/>
 
 <param name="morph" type="int" value="10"/>
 <param name="nb_of_colors" type="int" value="2"/>
 <param name="minTargetRadius" type="int" value="50"/>
-<param name="maxTargetRadius" type="int" value="200"/>
+<param name="maxTargetRadius" type="int" value="150"/>
 </node>
 
-<!-- <node name="camera_pcl" pkg="ras_project_camera" type="camera_pcl" output="screen"> </node> -->
+<node pkg="ras_project_camera" name="camera_pcl" type="camera_pcl" output="screen"> 
+</node>
+
+<node pkg="ras_project_camera" name="classification"  type="classification_backup.py" output="screen"> 
+</node> -->
+
+
 
 </launch>

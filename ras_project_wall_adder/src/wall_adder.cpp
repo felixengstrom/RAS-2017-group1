@@ -39,9 +39,10 @@ class WallAdder{
         void publishPOI(std::vector<float> dists);
 
     public:
+        void publishMap();
         WallAdder(std::vector<Line> map_, float POImaxDist_,
                   float POIminError_, int tolerance_, int minPOI_);
-        std::vector<float> rayTrace(float x, float y, float angle);
+        std::vector<float> rayTrace(float x, float y, float angle, std::vector<int> wall_id);
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
 
 };
@@ -142,9 +143,9 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     tf::StampedTransform transform;
     ros::Time t = truey.header.stamp;
     try{
-        listener.waitForTransform("map","robot",
+        listener.waitForTransform("map","est_pos",
                               t, ros::Duration(2));
-        listener.lookupTransform("map","robot",
+        listener.lookupTransform("map","est_pos",
                              t, transform);
     } catch(tf::TransformException &ex)
     {
@@ -155,12 +156,13 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     float y = transform.getOrigin().y();
     float angle = tf::getYaw(transform.getRotation());
 
-    std::vector<float> dists = rayTrace(x, y, angle);
+    std::vector<int> wall_id(360, -1);
+    std::vector<float> dists = rayTrace(x, y, angle, wall_id);
     std::vector<int> pointsOfInterest(dists.size());
     for (int i  = 0; i< truey.ranges.size(); i++){
         double lidar_range = truey.ranges[i];
         double map_range = dists[i];
-        if (lidar_range < POImaxDist and std::abs(lidar_range - map_range) > POIminError ) {
+        if (lidar_range < POImaxDist and map_range-lidar_range > POIminError ) {
             dists[i] = truey.ranges[i];
             pointsOfInterest[i] = 1;
         }else {
@@ -231,7 +233,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                - dists[firstMax]*sin(angle + firstMax * 2*PI/360 + lidar_displ_omega);
         line.x2 = x + x_disp 
                  - dists[lastMax]*cos(angle + lastMax * 2*PI/360 + lidar_displ_omega);
-        line.y2 = y - y_disp 
+        line.y2 = y + y_disp 
                  - dists[lastMax]*sin(angle + lastMax * 2*PI/360 + lidar_displ_omega);
         map.push_back(line);
 
@@ -260,7 +262,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 
 }
 
-std::vector<float> WallAdder::rayTrace(float x, float y, float angle)
+std::vector<float> WallAdder::rayTrace(float x, float y, float angle, std::vector<int> wall_id)
 {
     int n_angles = 359;
     std::vector<float> dists(n_angles);
@@ -294,6 +296,7 @@ std::vector<float> WallAdder::rayTrace(float x, float y, float angle)
                 (((x1>0) or (x2>=0)) and((x1*y2 - x2*y1)*y2 > 0)) and
                 std::min(x1, x2)<dists[a])
             {
+                wall_id[a] = w;
                 dists[a] = (x1*y2-x2*y1)/(y2-y1);
             }
 
@@ -353,13 +356,15 @@ int main(int argc, char*argv[])
 
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.6);
+    nh.param<float>("POImaxDist", POImaxDist, 0.4);
     float POIminError;
     nh.param<float>("POIminError", POIminError, 0.1);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 2);
+    nh.param<int>("tolerance", tolerance, 0);
+    int minPOI;
+    nh.param<int>("minPOI", minPOI, 2);
 
-    WallAdder wa(map, POImaxDist, POIminError, tolerance);
+    WallAdder wa(map, POImaxDist, POIminError, tolerance, minPOI);
     ros::Rate rate(10);
     while(ros::ok())
     {

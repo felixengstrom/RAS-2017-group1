@@ -279,6 +279,7 @@ void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 	{
 		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y);
 		
+		stamp = ros::Time::now();
     		map_load_time= ros::Time::now(); // Time() before
 	}
 	else ROS_INFO_STREAM("Wall Message recieved should be Two points!");

@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <math.h>
 #include <tf/transform_broadcaster.h>
-#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/Imu.h>
 #include <phidgets/motor_encoder.h>
@@ -18,6 +18,7 @@ class OdometryNode
         tf::TransformBroadcaster br;
         tf::Quaternion q;
         ros::Time time;
+        ros::Time last_reading;
         ros::Time time_imu;
         double current_v, current_w;
         double current_x, current_y, current_omega;
@@ -38,15 +39,16 @@ class OdometryNode
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
             imu = n_.subscribe("imu/data", 10, &OdometryNode::IMUCallback, this);
         }
-        void VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg );
+        void VelocityCallback(const geometry_msgs::TwistStamped::ConstPtr& msg );
         void UpdatePosition();
         void IMUCallback(const sensor_msgs::Imu::ConstPtr& msg);
 };
 
-void OdometryNode::VelocityCallback(const geometry_msgs::Twist::ConstPtr& msg)
+void OdometryNode::VelocityCallback(const geometry_msgs::TwistStamped::ConstPtr& msg)
 {
-    current_v = msg->linear.x;
-    current_w = msg->angular.z;
+    time = msg->header.stamp;
+    current_v = msg->twist.linear.x;
+    current_w = msg->twist.angular.z;
 }
 
 void OdometryNode::UpdatePosition()
@@ -71,7 +73,7 @@ void OdometryNode::UpdatePosition()
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "odom"));
+    br.sendTransform(tf::StampedTransform(transform, current_time, "map", "odom"));
 }
 
 void OdometryNode::IMUCallback(const sensor_msgs::Imu::ConstPtr& msg)
@@ -108,7 +110,7 @@ void OdometryNode::IMUCallback(const sensor_msgs::Imu::ConstPtr& msg)
 int main(int argc, char ** argv){
     ros::init(argc, argv, "odometry");
     OdometryNode on  = OdometryNode();
-    ros::Rate rate(100);
+    ros::Rate rate(1000);
     while(ros::ok())
     {
         ros::spinOnce();

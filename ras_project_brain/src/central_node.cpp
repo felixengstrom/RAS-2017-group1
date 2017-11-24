@@ -11,7 +11,7 @@
 #define MOVING_TO_POSITION_STATE 2
 #define OBJ_PICKUP_STATE 3
 
-
+static bool object_detected_prev;
 class CentralNode
 {
 public:
@@ -19,27 +19,31 @@ public:
     ros::NodeHandle n;
     ros::Publisher objectDetection_publisher;
     ros::Publisher objectPosition_publisher;
+    ros::Publisher motorStop_publisher;
     ros::Publisher arm_engageSuction_publisher;
     ros::Publisher objectCoordinateCalc_publisher;
     ros::Publisher tf_PickUp_publisher;
     ros::Subscriber objectDetection_subscriber;
+    ros::Subscriber objectClass_subscriber;
     tf::TransformListener listener;
 
     CentralNode()
     {
         n = ros::NodeHandle("~");
-        object_detected = 0;
-        object_detected_flag = 1;
+        object_detected_current = 0;
         start_coordCalc = 0;
         object_x_position = 0.0;
         engage_suction = 0;
+        stopMotor_toUpdate = 0;
         current_state = INITIAL_STATE;
-        objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 1);
+        objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
+        motorStop_publisher = n.advertise<std_msgs::Bool>("/pathFollow/start_stop", 1);
         objectPosition_publisher = n.advertise<std_msgs::Float32>("/motorController/moveToObj", 1);
-        arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("uarm/engageSuction",1);
+        arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
         objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);
         tf_PickUp_publisher = n.advertise<std_msgs::Bool>("/tf/pickup_obj", 1);
-        objectDetection_subscriber = n.subscribe("/camera/image/object_detected", 1, &CentralNode::objectDetectionCallback, this);
+        objectClass_subscriber = n.subscribe("/camera/object_class", 1, &CentralNode::objectClassCallback, this);
+        objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &CentralNode::objectDetectionCallback, this);
     }
 
     ~CentralNode()
@@ -49,7 +53,12 @@ public:
 
     void objectDetectionCallback(const std_msgs::Bool::ConstPtr &msg)
     {
-        object_detected = msg->data;
+        object_detected_current = msg->data;
+    }
+
+    void objectClassCallback(const std_msgs::String::ConstPtr &msg)
+    {
+        classString.assign(msg->data);
     }
 
     void pObjDetectionStateMachine()
@@ -58,27 +67,38 @@ public:
         switch (current_state)
         {
         case INITIAL_STATE:
-            if (1 == object_detected)
+            if (1 == object_detected_current && (object_detected_prev!=object_detected_current))
             {
+                ROS_INFO("In state object detected");
                 current_state = OBJ_DETECTION_STATE;
                 previous_state = INITIAL_STATE;
                 /*Send "Object found" string to speaker*/
-                if (1 == object_detected_flag)
-                {
-                    std::string detectionString("Object found");
-                    msg_eSpeak_string.data = detectionString;
-                    objectDetection_publisher.publish(msg_eSpeak_string);
-                    object_detected_flag = 0;
-                }
+                std::string detectionString("Object found");
+                msg_eSpeak_string.data = detectionString;
+                objectDetection_publisher.publish(msg_eSpeak_string);
+                msg_eSpeak_string.data = classString;
+                objectDetection_publisher.publish(msg_eSpeak_string);
                 /*Start the calculation of object coordinates wrt robot*/
                 start_coordCalc = 1;
+                stopMotor_toUpdate = 1;
                 msg_tfObjCalc_bool.data = start_coordCalc;
+                msg_motorStartStop_bool.data = stopMotor_toUpdate;
                 objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);
+                motorStop_publisher.publish(msg_motorStartStop_bool);
+                object_detected_prev = object_detected_current;
+            }
+            else if(0 == object_detected_current && (object_detected_prev!=object_detected_current))
+            {
+                //engage_suction = 0;
+                object_detected_prev = object_detected_current;
+                //msg_uarm_engageSuction_bool.data = engage_suction;
+                //arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
             }
             break;
         case OBJ_DETECTION_STATE:
             if(INITIAL_STATE == previous_state)
             {
+                ROS_INFO("In state move to object");
                 current_state = MOVING_TO_POSITION_STATE;
                 previous_state = OBJ_DETECTION_STATE;
                 ROS_INFO("%d",start_coordCalc);
@@ -104,12 +124,13 @@ public:
                         msg_odomDiffDist_float.data = 0.0;
                     }
                     objectPosition_publisher.publish(msg_odomDiffDist_float);
-                  }while(diff_distance<-0.03 || diff_distance>0.03);
+                  }while(diff_distance<-0.05 || diff_distance>0.05);
             }
             break;
         case MOVING_TO_POSITION_STATE:
             if(OBJ_DETECTION_STATE == previous_state)
             {
+                ROS_INFO("In state object pickup");
                 current_state = OBJ_PICKUP_STATE;
                 previous_state = MOVING_TO_POSITION_STATE;
                 engage_suction = 1;
@@ -126,29 +147,30 @@ public:
         case OBJ_PICKUP_STATE:
             if (MOVING_TO_POSITION_STATE == previous_state)
             {
+                ROS_INFO("In state initial");
                 current_state = INITIAL_STATE;
                 previous_state = OBJ_PICKUP_STATE;
-                engage_suction = 0;
                 start_coordCalc = 0;
                 pickup_object = 0;
-                object_detected_flag = 1;
+                stopMotor_toUpdate = 0;
+                msg_motorStartStop_bool.data = stopMotor_toUpdate;
                 msg_tfObjCalc_bool.data = start_coordCalc;
-                msg_uarm_engageSuction_bool.data = engage_suction;
                 tf_PickUp_publisher.publish(msg_tfPickUpObj_bool);
-                arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
                 objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);
+                motorStop_publisher.publish(msg_motorStartStop_bool);
             }
             break;
         }
     }
 
 private:
-    bool object_detected,object_detected_flag;
-    bool start_coordCalc, engage_suction, pickup_object;
+    std::string classString;
+    bool object_detected_current, start_coordCalc;
+    bool stopMotor_toUpdate, engage_suction, pickup_object;
     int current_state, previous_state;
     float object_x_position, diff_distance;
     std_msgs::String msg_eSpeak_string;
-    std_msgs::Bool msg_tfObjCalc_bool,msg_uarm_engageSuction_bool,msg_tfPickUpObj_bool;
+    std_msgs::Bool msg_tfObjCalc_bool,msg_uarm_engageSuction_bool,msg_tfPickUpObj_bool, msg_motorStartStop_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
 };
 

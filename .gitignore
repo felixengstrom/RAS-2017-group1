@@ -1,6 +1,9 @@
 
 *.swp
 *~
-ras_project_camera/src/VGG16_trained_model.h5
+ras_project_camera/src/VGG1*
 *_backup.py
 
+*.save
+*.zip
+*.bag

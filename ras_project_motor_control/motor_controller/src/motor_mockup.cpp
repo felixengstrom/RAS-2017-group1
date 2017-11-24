@@ -1,6 +1,6 @@
 #include <ros/ros.h>
 #include <std_msgs/Float32.h>
-#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <tf/transform_broadcaster.h>
 #include <stdlib.h>
 #include <random>
@@ -31,7 +31,7 @@ int main (int argc, char **argv)
     ros::Publisher est_vel_pub;
     
     teleop_sub = n_.subscribe("motor_teleop/twist", 10, teleopCallback);
-    est_vel_pub = n_.advertise<geometry_msgs::Twist>("est_robot_vel/twist", 10);
+    est_vel_pub = n_.advertise<geometry_msgs::TwistStamped>("est_robot_vel/twist", 10);
 
     geometry_msgs::PoseStamped truepose;
     tf::TransformBroadcaster br;
@@ -39,7 +39,6 @@ int main (int argc, char **argv)
     tf::Transform transform;
     tf::Quaternion q;
     
-    ros::Rate loop_rate(10);
 
     float current_x = 0.22; 
     float current_y = 0.22;
@@ -52,7 +51,7 @@ int main (int argc, char **argv)
     br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "odom"));
     ros::Time last  = ros::Time::now();
 
-    ros::Rate rate(10);
+    ros::Rate rate(100);
 
     while(ros::ok())
     {   
@@ -61,24 +60,25 @@ int main (int argc, char **argv)
         last = current;
         current_x = current_x +elapsed.toSec()*lin_vel_*cos(current_omega + ang_vel_*0.05);
         current_y = current_y +elapsed.toSec()*lin_vel_*sin(current_omega + ang_vel_*0.05);
-        current_omega = current_omega + ang_vel_*0.1;
+        current_omega = current_omega + ang_vel_*elapsed.toSec();
             
         q.setRPY(0, 0, current_omega);
         transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
         transform.setRotation(q);
         br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "truepos"));
-        geometry_msgs::Twist mes;
+        geometry_msgs::TwistStamped mes;
 
         // Todo: add noice to simulate error inm essurements
-        mes.linear.x = lin_vel_ + abs(lin_vel_*noise(rng)*0);
-        mes.angular.z = ang_vel_+ ang_vel_*noise(rng)*0;
+        mes.header.stamp = ros::Time::now();
+        mes.twist.linear.x = lin_vel_ + abs(lin_vel_*noise(rng)*0);
+        mes.twist.angular.z = ang_vel_+ ang_vel_*noise(rng)*0;
 
         est_vel_pub.publish(mes);
 
         // Todo: add code to publish simulated postion on map
 
         ros::spinOnce();
-        loop_rate.sleep();
+        rate.sleep();
     }
     return 0;
 }

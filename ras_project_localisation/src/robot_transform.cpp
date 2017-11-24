@@ -72,7 +72,7 @@ void RobotBroadcaster::publishCurrentPose()
     tf::quaternionMsgToTF(currentPose.pose.orientation, q);
     transform.setOrigin(tf::Vector3(x,y,0.0));
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform,ros::Time::now(),"map","robot"));
+    br.sendTransform(tf::StampedTransform(transform,t,"map","robot"));
 
 }
 

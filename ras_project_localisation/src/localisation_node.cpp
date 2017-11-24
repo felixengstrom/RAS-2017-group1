@@ -3,6 +3,7 @@
 #include "geometry_msgs/Point.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "tf/transform_listener.h"
+#include "tf/transform_broadcaster.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -32,6 +33,7 @@ class ParticleFilter
         double lidar_displ_x;
         double lidar_displ_y;
         double lidar_displ_omega;
+        tf::TransformBroadcaster br;
         
     public:
       
@@ -65,7 +67,8 @@ ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
                                                        n(),nScans(_nScans),
                                                        ang_noise(0,0.05), 
                                                        particles(), map(_map),
-                                                       hasScan(false)
+                                                       hasScan(false),
+                                                       br()
 {   
     initialPose.header.stamp = ros::Time::now();
     tf::StampedTransform transform;
@@ -170,6 +173,14 @@ void ParticleFilter::resample_particles()
 void ParticleFilter::scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
     hasScan = true;
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(lastPose.pose.position.x, lastPose.pose.position.y, 0));
+    tf::Quaternion q;
+    tf::quaternionMsgToTF(lastPose.pose.orientation, q);
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, latest_scan.header.stamp , "map", "est_pos"));
+
+
     update_particles_position(msg->header.stamp);
     latest_scan = sensor_msgs::LaserScan(*msg);
 }
@@ -191,7 +202,7 @@ void ParticleFilter::update_particles_position(ros::Time t)
     {
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
-        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)) + ang_noise(rng)*0.4;
+        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)*0.1) + ang_noise(rng)*0.4;
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
@@ -377,24 +388,30 @@ int main(int argc, char*argv[])
     ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
     ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("/localisation/pose", 10);
 
+
+    double x_start;
+    nh.param<double>("x_start", x_start, 0.22);
+    double y_start;
+    nh.param<double>("y_start", y_start, 0.22);
+
     geometry_msgs::PoseStamped pp;
-    std_msgs::Header h;
-    h.frame_id = "map";
-    h.stamp = ros::Time::now();
-    pp.header = h;
-    geometry_msgs::Point p;
-    p.x = 0.22;
-    p.y = 0.22;
-    pp.pose.position = p;
-    geometry_msgs::Quaternion q;
-    float alpha = PI/2;
-    q.w = cos(alpha/2);
-    q.z = sin(alpha/2);
-    pp.pose.orientation = q;
+    pp.pose.position.x = x_start;
+    pp.pose.position.y = y_start;
+
+    pp.header.frame_id = "map";
+    pp.header.stamp = ros::Time::now();
+
+
+    double omega_start;
+    nh.param<double>("omega_start",omega_start, PI/2);
+    float alpha =omega_start;
+    pp.pose.orientation.w = cos(alpha/2);
+    pp.pose.orientation.z = sin(alpha/2);
+    ROS_INFO("x_start %f, ystart %f, omega_start %f", x_start, y_start, omega_start);
     
     ParticleFilter pf(pp, 1000,16, map);   
 
-    ros::Rate rate(10);
+    ros::Rate rate(100);
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();

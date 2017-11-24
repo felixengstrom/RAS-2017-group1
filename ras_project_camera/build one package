@@ -1,3 +1,5 @@
+/home/ras11/catkin_ws/devel/lib/ras_project_camera
+
 
 rosbag record /topic/
 
