@@ -143,7 +143,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	geometry_msgs::PoseArray following_points;
 	geometry_msgs::Pose arp;
 	arp.position.x=Q0; arp.position.y=W0;
-//	following_points.poses.push_back(arp); commented out because starting position is redundant, and fucks with path foloowing
+	following_points.poses.push_back(arp); //commented out because starting position is redundant, and fucks with path foloowing
 
 
 	//wall_marker is for rviz
@@ -163,6 +163,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	wall_marker.pose.position.y = 0;
 	geometry_msgs::Point pnt;
 	pnt.x=Q0; pnt.y=W0;
+	ROS_INFO_STREAM(" x = " << Q0 << " y = " << W0);
 	wall_marker.points.push_back(pnt);
 	for(int i=1;i<path_list.size();i++)
 	{
