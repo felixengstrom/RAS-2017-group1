@@ -1,12 +1,13 @@
 <launch>
 
-<!-- <include file="$(find realsense_camera)/realsense_camera/launch/sr300_nodelet_rgbd.launch)" /> -->
+<include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch)" />
 
 <node pkg="ras_project_camera" name="detection" type="detection" output="screen"> 
 <param name="min_object_size" type="int" value="30" />
+<param name="min_obstacle_size" type="int" value="250" />
 </node>
 
-<node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen" cwd="node">
+<!--<node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen" cwd="node">
 <param name="green_h_max" type="int" value="75"/>
 <param name="green_s_max" type="int" value="255"/>
 <param name="green_v_max" type="int" value="255"/>
@@ -66,7 +67,7 @@
 </node>
 
 <node pkg="ras_project_camera" name="classification"  type="classification_backup.py" output="screen"> 
-</node>
+</node> -->
 
 
 
