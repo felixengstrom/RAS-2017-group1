@@ -2,6 +2,7 @@
 #include <std_msgs/Float32.h>
 #include "phidgets/motor_encoder.h"
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <tf/transform_broadcaster.h>
 #include <stdlib.h>
 
@@ -124,9 +125,9 @@ int main (int argc, char **argv)
     obj_position_move_sub = n_.subscribe("/motorController/moveToObj", 1, objPositionMoveCallback);
     vel_left_pub = n_.advertise<std_msgs::Float32>("left_motor/cmd_vel", 10);
     vel_right_pub = n_.advertise<std_msgs::Float32>("right_motor/cmd_vel", 10);
-    est_vel_pub = n_.advertise<geometry_msgs::Twist>("est_robot_vel/twist", 10);
+    est_vel_pub = n_.advertise<geometry_msgs::TwistStamped>("est_robot_vel/twist", 10);
     
-    ros::Rate loop_rate(10);
+    ros::Rate loop_rate(100);
 
     ros::NodeHandle nh("~");
 	nh.getParam("alpha_left",alpha_left);
@@ -251,10 +252,11 @@ int main (int argc, char **argv)
 
             //Publishing estimated velosity of robot to calc odometry  
             
-            geometry_msgs::Twist mes;
+            geometry_msgs::TwistStamped mes;
 
-            mes.linear.x = v;
-            mes.angular.z = omega;
+            mes.header.stamp = ros::Time::now();
+            mes.twist.linear.x = v;
+            mes.twist.angular.z = omega;
 
             est_vel_pub.publish(mes);
 
