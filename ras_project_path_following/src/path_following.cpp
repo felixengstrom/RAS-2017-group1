@@ -90,8 +90,8 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    if(!updated){return;} // should one add at least 0 velocity publish here?
    geometry_msgs::PoseStamped robot_pose = *msg;
    geometry_msgs::Twist move;
-   double y_current = robot_pose.pose.position.y;
-   double x_current = robot_pose.pose.position.x;
+   float y_current = robot_pose.pose.position.y;
+   float x_current = robot_pose.pose.position.x;
    //double final_pose= poses.poses[current_pose].orientation.z; // Z NOT QUATERINO, ITS YAW
    //double theta = atan2(y_desired-y_current, x_desired-x_current);
    float PI = std::acos(-1);
@@ -105,11 +105,9 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    float distance_line;
    for (int i = 0; i < nb_poses - 1; i++)
    {
-	float x1 = poses.poses[i].position.x;
-	float y1 = poses.poses[i].position.y;
-	float x2 = poses.poses[i+1].position.x;
-	float y2 = poses.poses[i+1].position.y;
-        float projection_length = std::max(0.0, std::min(1.0, (x_current - poses.poses[i].position.x)*vectors[i][0] + (y_current - poses.poses[i].position.y)*vectors[i][1]));
+	float segment_length = std::sqrt(std::pow(poses.poses[i+1].position.x-poses.poses[i].position.x,2)+std::pow(poses.poses[i+1].position.y-poses.poses[i].position.y,2));
+	float projection_length = (x_current - poses.poses[i].position.x)*vectors[i][0] + (y_current - poses.poses[i].position.y)*vectors[i][1];
+        projection_length = std::max(0.0f, std::min(segment_length, projection_length));
 	float projection[2] = {poses.poses[i].position.x + projection_length*vectors[i][0], poses.poses[i].position.y + projection_length*vectors[i][1]};
 	float distance = std::sqrt(std::pow(x_current - projection[0],2)+std::pow(y_current - projection[1], 2));
 	if (distance < smallest_distance || smallest_distance == -1)
@@ -136,10 +134,10 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    {
 	if (first)
 	    ROS_INFO("Vector %d, x: %f; y: %f",i ,vectors[i][0], vectors[i][1]);
-	float a = std::pow(vectors[i][0],2) + std::pow(vectors[i][1],2);
-	float b = 2.0*vectors[i][0]*(poses.poses[i].position.x - closest_point[0]) + 2.0*vectors[i][1]*(poses.poses[i].position.y - closest_point[1]);
-	float c = std::pow(poses.poses[i].position.y-closest_point[1],2) + std::pow(poses.poses[i].position.x-closest_point[0],2) - std::pow(D,2);
-	float delta = std::pow(b,2) - 4.0*a*c;
+        float a = std::pow(vectors[i][0],2) + std::pow(vectors[i][1],2);
+        float b = 2.0*vectors[i][0]*(poses.poses[i].position.x - closest_point[0]) + 2.0*vectors[i][1]*(poses.poses[i].position.y - closest_point[1]);
+        float c = std::pow(poses.poses[i].position.y-closest_point[1],2) + std::pow(poses.poses[i].position.x-closest_point[0],2) - std::pow(D,2);
+        float delta = std::pow(b,2) - 4.0*a*c;
 	if (delta == 0.0 && -b/(2.0*a) >= 0)
 	{
 	    goal_point[0] = poses.poses[i].position.x + (-b/(2.0*a))*vectors[i][0];
@@ -150,41 +148,16 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	{
 	    float z1 = (-b-std::sqrt(delta))/(2.0*a);
 	    float z2 = (-b+std::sqrt(delta))/(2.0*a);
+        float z = std::max(z1, z2);
 	    float segment = std::sqrt(std::pow(poses.poses[i+1].position.y - poses.poses[i].position.y, 2)+std::pow(poses.poses[i+1].position.x - poses.poses[i].position.x,2));
-	    if (i == closest_line)
-	    {
-		if (z1 > distance_line && z1 <= segment && (z1 < z2 || z2 <= distance_line))
+		if (z <= segment )
 		{
-		    goal_point[0] = poses.poses[i].position.x + z1*vectors[i][0];
-		    goal_point[1] = poses.poses[i].position.y + z1*vectors[i][1];
+		    goal_point[0] = poses.poses[i].position.x + z*vectors[i][0];
+		    goal_point[1] = poses.poses[i].position.y + z*vectors[i][1];
 		    if (first)
 		    	ROS_INFO("Goal Point - x: %f, y: %f",goal_point[0],goal_point[1]);
 		    break;
 		}
-		else if (z2 > distance_line && z1 <= segment && (z2 < z1 || z1 <= distance_line))
-		{
-		    goal_point[0] = poses.poses[i].position.x + z2*vectors[i][0];
-		    goal_point[1] = poses.poses[i].position.y + z2*vectors[i][1];
-		    if (first)
-		    	ROS_INFO("Goal Point - x: %f, y: %f", goal_point[0],goal_point[1]);
-		    break;
-		}
-	    }
-	    else
-	    {
-		if (z1 >= 0 && z1 <= segment && (z1 < z2 || z2 < 0))
-		{
-		    goal_point[0] = poses.poses[i].position.x + z1*vectors[i][0];
-		    goal_point[1] = poses.poses[i].position.y + z1*vectors[i][1];
-		    break;
-		}
-		else if (z2 >= 0 && z2 <= segment && (z2 < z1 || z1 < 0))
-		{
-		    goal_point[0] = poses.poses[i].position.x + z2*vectors[i][0];
-		    goal_point[1] = poses.poses[i].position.y + z2*vectors[i][1];
-		    break;
-		}
-	    }
 	}
    }
    if (i == nb_poses)
@@ -203,10 +176,24 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    }
    // Now we should calculate the curvature of the circle we want to follow to the point
    float curvature = 2*xgv/std::pow(D,2);
+   if (curvature == 0.0 && goal_point[0] == poses.poses[nb_poses-1].position.x && goal_point[1] == poses.poses[nb_poses-1].position.y)
+   {
+	move.linear.x = 0;
+	move.angular.z = 0;
+   }
+   else if (curvature==0.0)
+   {
+       move.linear.x = speed;
+       move.angular.z = 0;
+   }
+   else
+   {
    // Then we calculate the angular_velocity necessary to follow the right trajectory
-   float time = (2*PI)/(curvature*speed);
-   move.linear.x = speed;
-   move.angular.z = -2*PI/time;
+       float time = (2*PI)/(curvature*speed);
+       move.linear.x = speed;
+       move.angular.z = -2*PI/time;
+   }
+   
    if (first)
    {
 	ROS_INFO("Linear: %f, Angular: %f", move.linear.x, move.angular.z);
@@ -218,7 +205,7 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 int main(int argc, char** argv) {
     ros::init(argc, argv, "path_following");
     PathFollowing P;
-    ros::Rate r(50);
+    ros::Rate r(100);
     while(ros::ok()) {
 	ros::spinOnce();
 	r.sleep();

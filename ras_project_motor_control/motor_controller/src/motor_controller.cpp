@@ -22,7 +22,7 @@ class EncoderListener
     private:
         ros::Subscriber left_encoder_sub;
         ros::Subscriber right_encoder_sub;
-        
+        ros::Subscriber teleop_sub;
     public:
         int last_change_right;
         int last_change_left;
@@ -32,9 +32,11 @@ class EncoderListener
         ros::Time last_reading_right;
         double duration_left;
         double duration_right;
+	//bool new_values = false;
         EncoderListener( ros::NodeHandle& n_);
         void LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
         void RightEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg);
+	void teleopCallback(const geometry_msgs::Twist::ConstPtr& msg);
 };
 
 EncoderListener::EncoderListener( ros::NodeHandle& n_ )
@@ -47,6 +49,7 @@ EncoderListener::EncoderListener( ros::NodeHandle& n_ )
     right_encoder_sub = n_.subscribe("/right_motor/encoder", 1,
                                     &EncoderListener::RightEncoderCallback,
                                             this);
+    teleop_sub = n_.subscribe("motor_teleop/twist", 1, &EncoderListener::teleopCallback, this);
     last_change_right = 0;
     last_change_left = 0;
     duration_left = 0;
@@ -91,8 +94,9 @@ void EncoderListener::RightEncoderCallback(const phidgets::motor_encoder::ConstP
     //ROS_INFO("Encoder right sum %i", msg->count );
 }
 
-void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
+void EncoderListener::teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
 {
+    //this->new_values = true;
     lin_vel_ = msg->linear.x;
     ang_vel_ = msg->angular.z;
 }
@@ -121,7 +125,7 @@ int main (int argc, char **argv)
     
     EncoderListener listener = EncoderListener(n_);
 
-    teleop_sub = n_.subscribe("motor_teleop/twist", 10, teleopCallback);
+    //teleop_sub = n_.subscribe("motor_teleop/twist", 10, &EncoderListener::teleopCallback, listener);
     obj_position_move_sub = n_.subscribe("/motorController/moveToObj", 1, objPositionMoveCallback);
     vel_left_pub = n_.advertise<std_msgs::Float32>("left_motor/cmd_vel", 10);
     vel_right_pub = n_.advertise<std_msgs::Float32>("right_motor/cmd_vel", 10);
@@ -158,6 +162,12 @@ int main (int argc, char **argv)
     double alpha_right = 2.0;///5;//12
     double beta_right = 0.0;//30.0;///5;//20
     */
+    float last_v = 0;
+    float last_omega = 0;
+    float last_pwmr = 0;
+    float last_pwml = 0;
+    float pwm_right_float = 0;
+    float pwm_left_float = 0;
     while(ros::ok())
     {
 		ROS_INFO("--------------------------------------------------------------");
@@ -211,8 +221,8 @@ int main (int argc, char **argv)
             int_err_right += error_right*listener.duration_right;
 
 			//set max PWM values 100
-            float pwm_left_float = std:: max(-100.0, (std::min(100.0, (proportion_left * desired_wl + alpha_left * error_left + beta_left * int_err_left))));
-            float pwm_right_float =  std::max(-100.0, (std::min(100.0, (proportion_right * desired_wr + alpha_right * error_right + beta_right * int_err_right))));
+            pwm_left_float = std:: max(-100.0, (std::min(100.0, (proportion_left * desired_wl + alpha_left * error_left + beta_left * int_err_left))));
+            pwm_right_float =  std::max(-100.0, (std::min(100.0, (proportion_right * desired_wr + alpha_right * error_right + beta_right * int_err_right))));
     		if (abs(pwm_left_float)==100.0)
 			{
 				int_err_left -= error_left*listener.duration_left;
@@ -260,7 +270,7 @@ int main (int argc, char **argv)
 
             est_vel_pub.publish(mes);
 
-            lin_vel_ = ang_vel_ = 0;
+            //lin_vel_ = ang_vel_ = 0;
             listener.last_change_left = 0;
             listener.last_change_right = 0;
             listener.duration_left = 0;
