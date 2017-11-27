@@ -60,6 +60,7 @@ class PathPlanning
 		//Path Planning
 		std::map <int, int > cameFrom;
 		double x_start, y_start,x_goal,y_goal,w_goal;
+		ros::Time pathTime;
 		//Path Smoothing
 		std::vector<int> path_list;
 		//A* Heuristic wall avoiding value
@@ -181,7 +182,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 		if(i==path_list.size()-1) arp.orientation.w=w_goal;
 		following_points.poses.push_back(arp);
 	}
-	following_points.header.stamp =ros::Time::now();
+	following_points.header.stamp =pathTime;
 	Path_pub.publish(wall_marker);
 	Path_follower_pub.publish(following_points);
 	}
@@ -381,7 +382,7 @@ else{ROS_INFO_STREAM("Start Position outside maze"); return;}
 //Reset values
 path_list.clear();
 cameFrom.clear();
-
+pathTime = ros::Time::now();
 
 
 std::map <int,point> openSet;
