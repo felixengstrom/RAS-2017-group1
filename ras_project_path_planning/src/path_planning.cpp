@@ -59,7 +59,7 @@ class PathPlanning
 
 		//Path Planning
 		std::map <int, int > cameFrom;
-		double x_start, y_start,x_goal,y_goal;
+		double x_start, y_start,x_goal,y_goal,w_goal;
 		//Path Smoothing
 		std::vector<int> path_list;
 		//A* Heuristic wall avoiding value
@@ -178,6 +178,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 		ROS_INFO_STREAM(" x = " << Q1 << " y = " << W1);
 
 		arp.position.x=Q1; arp.position.y=W1;
+		if(i==path_list.size()-1) arp.orientation.w=w_goal;
 		following_points.poses.push_back(arp);
 	}
 	following_points.header.stamp = goal_update;
@@ -194,6 +195,7 @@ void PathPlanning::GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 		goal_update=gNow;
 	x_goal=msg->pose.position.x;
 	y_goal=msg->pose.position.y;
+	w_goal=msg->pose.orientation.w;
 	path_list.clear(); // New goal, reset path list computed
 	ROS_INFO_STREAM("New Goal Recieved! goal x : "<< x_goal << " goal y : " << y_goal << " path_list.size : " << path_list.size());
 	}
