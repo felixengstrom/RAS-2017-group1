@@ -40,6 +40,7 @@ class Exploration
 		//Path Publisher
 		ros::Publisher Dest_pub; //Destination publisher
 		ros::Publisher eMap_pub; // Published explored path so far
+		ros::Publisher done_pub; //Publishes True when done, false while not done
 		//--------------------//
 		//State Variable  
 		ros::Time t_update;
@@ -51,6 +52,7 @@ class Exploration
 		nav_msgs::OccupancyGrid Csp;
 		bool Csp_received;		
 		bool GO,GO_once;
+		std_msgs::Bool Done; //publish Done when done.
 		//-------------------------//
 		
 		//Parameters Initializeable with n.param//
@@ -72,8 +74,10 @@ class Exploration
 
 		Exploration() : Exp_initialized(false),GO_once(false),GO(false),Csp_received(false)
 		{
+
 			//Initialize
 			n = ros::NodeHandle();
+			Done.data=false;
 			Csp.header.stamp = ros::Time::now();
 			n.param<int>("resolution_cutting",resolution_cutting,10);
 			n.param<double>("foward_margin",forward_exp,0.2);
@@ -84,7 +88,7 @@ class Exploration
 			curr_sub = n.subscribe("/robot/pose",10,&Exploration::CurrCallback,this);
 			Dest_pub = n.advertise<geometry_msgs::PoseStamped>("/robot/goal",0);	
 			eMap_pub = n.advertise<nav_msgs::OccupancyGrid>("/Explored_map",0);
-			
+			done_pub = n.advertise<std_msgs::Bool>("/Explored/done",0);
 		}
 
 		void loop_function();
@@ -340,15 +344,26 @@ void Exploration::loop_function()
 if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
+	if(calc_explored() >= 0.5)
+	{
+		Done.data = true;
 
+	}
+	else
+	{
+		Done.data = false;
 	if(GO && Csp_received)
 	{
 		random_search();
 		GO=false;
 	}
+	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.1 && Csp_received)
+	{ random_search(); }
 	if(GO_once)
 		Dest_pub.publish(goal_pos);
 
+	}
+	done_pub.publish(Done);
 }
 return;
 }
