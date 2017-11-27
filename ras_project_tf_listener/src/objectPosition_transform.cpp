@@ -23,13 +23,15 @@ void objectDetection_Callback(const std_msgs::Bool::ConstPtr& msg)
     object_present = msg->data;
 }
 
-void transformPoint(const tf::TransformListener& listener)
+void transformPoint(const tf::TransformListener& listener, ros::Publisher objectMap_publisher)
 {
     static tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
-    //we'll create a point in the camera frame that we'd like to transform to the robot frame
+    tf::StampedTransform transform_map;
+    geometry_msgs::PointStamped mapObjPos_msg;
 
+    //we'll create a point in the camera frame that we'd like to transform to the robot frame
     object_point.header.frame_id = "camera";
  
     //we'll just use the most recent transform available for our simple example
@@ -55,6 +57,24 @@ void transformPoint(const tf::TransformListener& listener)
         {
             ROS_ERROR("Received an exception trying to transform a point from \"camera\" to \"robot\": %s", ex.what());
         }
+        try
+        {
+
+            listener.waitForTransform("map","object",ros::Time(0), ros::Duration(2));
+            listener.lookupTransform("map", "object", ros::Time(0), transform_map);
+        }
+        catch(tf::TransformException &ex)
+        {
+            ROS_ERROR("%s",ex.what());
+        }
+
+        mapObjPos_msg.point.x = transform_map.getOrigin().x();
+        mapObjPos_msg.point.y = transform_map.getOrigin().y();
+        mapObjPos_msg.point.z = 0.0;
+        mapObjPos_msg.header.frame_id = "map";
+        mapObjPos_msg.header.stamp = ros::Time::now();
+
+        objectMap_publisher.publish(mapObjPos_msg);
     }
 }
  
@@ -65,9 +85,10 @@ int main(int argc, char** argv)
     tf::TransformListener listener(ros::Duration(10));
     ros::Subscriber sub_position = n.subscribe("camera/world_coord", 1, objectPosition_Callback);
     ros::Subscriber sub_detection = n.subscribe("/tf/start_calc", 1, objectDetection_Callback);
-  
+    ros::Publisher objectMap_publisher = n.advertise<geometry_msgs::PointStamped>("/map/objectCoord", 1);
+
    //we'll transform a point once every second
-   ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener)));
+   ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(objectMap_publisher)));
  
    ros::spin();
  
