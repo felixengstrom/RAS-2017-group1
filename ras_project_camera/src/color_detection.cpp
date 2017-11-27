@@ -24,6 +24,7 @@ public:
   ros::Subscriber detection_sub;
   ros::Publisher object_coord_pub;
   ros::Publisher object_flag_pub;
+  cv::Mat hsv_frame;
   
   int green_h_max, green_s_max, green_v_max, green_h_min, green_s_min, green_v_min, morph, nb_of_colors;
   int blue_h_max, blue_s_max, blue_v_max, blue_h_min, blue_s_min, blue_v_min;
@@ -35,7 +36,7 @@ public:
   int minTargetRadius, maxTargetRadius;
   bool detected;
 
-  ImageConverter(): it_(nh_)
+  ImageConverter(): it_(nh_), hsv_frame()
   {
     //bool detected = 0;
     image_sub_ = it_.subscribe("/camera/rgb/image_raw", 1, &ImageConverter::ImageCb, this);
@@ -132,36 +133,43 @@ public:
           std::cerr << "detected" << detected << std::endl;
         {
           static int image_count = 0;
-      //Image processing
-      cv::Mat rgb_frame;
-      cv::Mat hsv_frame;
-      cv::Mat thresholded_frame, thresholded_frame1, thresholded_frame2, thresholded_frame3, 
+          //Image processing
+          cv::Mat rgb_frame;
+                
+          cv::GaussianBlur(cv_ptr->image, rgb_frame, cv::Size(9,9),50);
+          cv::cvtColor(rgb_frame, hsv_frame, CV_RGB2HSV);
+        
+          cv::Scalar   green_min(green_h_min,green_s_min,green_v_min);
+          cv::Scalar   green_max(green_h_max,green_s_max,green_v_max);
+
+          cv::Scalar   blue_min(blue_h_min,blue_s_min,blue_v_min);
+          cv::Scalar   blue_max(blue_h_max,blue_s_max,blue_v_max);
+
+          cv::Scalar   red_min(red_h_min,red_s_min,red_v_min);
+          cv::Scalar   red_max(red_h_max,red_s_max,red_v_max);
+
+          cv::Scalar   yellow_min(yellow_h_min,yellow_s_min,yellow_v_min);
+          cv::Scalar   yellow_max(yellow_h_max,yellow_s_max,yellow_v_max);
+
+          cv::Scalar   purple_min(purple_h_min,purple_s_min,purple_v_min);
+          cv::Scalar   purple_max(purple_h_max,purple_s_max,purple_v_max);
+
+          cv::Scalar   orange_min(orange_h_min,orange_s_min,orange_v_min);
+          cv::Scalar   orange_max(orange_h_max,orange_s_max,orange_v_max);
+
+          cv::Scalar   obstacle_min(obstacle_h_min,obstacle_s_min,obstacle_v_min);
+          cv::Scalar   obstacle_max(obstacle_h_max,obstacle_s_max,obstacle_v_max);
+    }
+  }
+};
+
+int main(int argc, char* argv[]) //int main(int argc, char** argv)
+{
+  ros::init(argc, argv, "color_detection");
+  ImageConverter ic;
+  cv::Mat thresholded_frame, thresholded_frame1, thresholded_frame2, thresholded_frame3, 
       thresholded_frame4, thresholded_frame5, thresholded_frame6, thresholded_frame7;
-      
-      cv::GaussianBlur(cv_ptr->image, rgb_frame, cv::Size(9,9),50);
-      cv::cvtColor(rgb_frame, hsv_frame, CV_RGB2HSV);
-    
-      cv::Scalar   green_min(green_h_min,green_s_min,green_v_min);
-      cv::Scalar   green_max(green_h_max,green_s_max,green_v_max);
 
-      cv::Scalar   blue_min(blue_h_min,blue_s_min,blue_v_min);
-      cv::Scalar   blue_max(blue_h_max,blue_s_max,blue_v_max);
-
-      cv::Scalar   red_min(red_h_min,red_s_min,red_v_min);
-      cv::Scalar   red_max(red_h_max,red_s_max,red_v_max);
-
-      cv::Scalar   yellow_min(yellow_h_min,yellow_s_min,yellow_v_min);
-      cv::Scalar   yellow_max(yellow_h_max,yellow_s_max,yellow_v_max);
-
-      cv::Scalar   purple_min(purple_h_min,purple_s_min,purple_v_min);
-      cv::Scalar   purple_max(purple_h_max,purple_s_max,purple_v_max);
-
-      cv::Scalar   orange_min(orange_h_min,orange_s_min,orange_v_min);
-      cv::Scalar   orange_max(orange_h_max,orange_s_max,orange_v_max);
-
-      cv::Scalar   obstacle_min(obstacle_h_min,obstacle_s_min,obstacle_v_min);
-      cv::Scalar   obstacle_max(obstacle_h_max,obstacle_s_max,obstacle_v_max);
-  
       cv::inRange(hsv_frame, green_min, green_max, thresholded_frame1);
       cv::inRange(hsv_frame, blue_min, blue_max, thresholded_frame2);
       cv::inRange(hsv_frame, red_min, red_max, thresholded_frame3);
@@ -211,6 +219,7 @@ public:
       // Morphological closing 
       cv::dilate(thresholded_frame6, thresholded_frame6, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
       cv::erode(thresholded_frame6, thresholded_frame6, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
+      
       // Morphological opening
       cv::erode(thresholded_frame7, thresholded_frame7, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
       cv::dilate(thresholded_frame7, thresholded_frame7, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
@@ -224,8 +233,6 @@ public:
       thresholded_frame = max(thresholded_frame5, thresholded_frame);
       thresholded_frame = max(thresholded_frame6, thresholded_frame);
       thresholded_frame = max(thresholded_frame7, thresholded_frame);
-      
-
       
       cv::vector<cv::vector<cv::Point> > contours;
       cv::vector<cv::Vec4i> heirarchy;
@@ -243,8 +250,8 @@ public:
 
         if ( r >= minTargetRadius && r <= maxTargetRadius)
         {
-        	center.push_back(c);
-        	radius.push_back(r);
+          center.push_back(c);
+          radius.push_back(r);
         }
       }
       std_msgs::Bool object_flag;
@@ -276,10 +283,9 @@ public:
 
       else
       {
-      
-      object_flag.data = 0;
-      object_coord.x = 0.0;
-      object_coord.y = 0.0;
+        object_flag.data = 0;
+        object_coord.x = 0.0;
+        object_coord.y = 0.0;
       }
       object_flag_pub.publish(object_flag);
       object_coord_pub.publish(object_coord);
@@ -292,17 +298,10 @@ public:
 
       cv::imshow(OPENCV_WINDOW, thresholded_frame);
       cv::waitKey(3);
-      loop_rate.sleep();
+      
       ros::spinOnce();
+      loop_rate.sleep();
     }
-    }
-  }
-};
-
-int main(int argc, char* argv[]) //int main(int argc, char** argv)
-{
-  ros::init(argc, argv, "color_detection");
-  ImageConverter ic;
   ros::spin();
   return 0;
 }
