@@ -147,11 +147,15 @@ include_directories(
 
  add_executable(${PROJECT_NAME}_node src/path_planning.cpp)
  add_executable(OccupancyGrid_node src/OccupancyGrid.cpp)
-## Specify libraries to link a library or executable target against
+ add_executable(Exploration_mode src/Exploration_mode.cpp)
+ ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
    ${catkin_LIBRARIES} )
 
 target_link_libraries(OccupancyGrid_node
+   ${catkin_LIBRARIES} )
+
+target_link_libraries(Exploration_mode
    ${catkin_LIBRARIES} )
 #############
 ## Install ##
