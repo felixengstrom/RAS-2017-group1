@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+
 #include <math.h>
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -38,6 +39,7 @@ class OdometryNode
             n_ = ros::NodeHandle();
             sub = n_.subscribe("est_robot_vel/twist", 10, &OdometryNode::VelocityCallback, this);
             imu = n_.subscribe("imu/data", 10, &OdometryNode::IMUCallback, this);
+            odom_pub = n_.advertise<geometry_msgs::PoseStamped>("test", 1);
         }
         void VelocityCallback(const geometry_msgs::TwistStamped::ConstPtr& msg );
         void UpdatePosition();
@@ -70,6 +72,9 @@ void OdometryNode::UpdatePosition()
     pose.pose.orientation.w = cos(0.5*current_omega);
     pose.pose.orientation.z = sin(0.5*current_omega);
 
+    odom_pub.publish(pose);
+
+    //std::cout <<"odom print" << current_x << " " << current_y << " " << current_omega<< std::endl;
     transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
     q.setRPY(0, 0, current_omega);
     transform.setRotation(q);

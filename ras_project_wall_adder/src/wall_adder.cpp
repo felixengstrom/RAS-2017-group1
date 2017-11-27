@@ -356,13 +356,13 @@ int main(int argc, char*argv[])
 
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.4);
+    nh.param<float>("POImaxDist", POImaxDist, 0.7);
     float POIminError;
     nh.param<float>("POIminError", POIminError, 0.1);
     int tolerance;
     nh.param<int>("tolerance", tolerance, 0);
     int minPOI;
-    nh.param<int>("minPOI", minPOI, 2);
+    nh.param<int>("minPOI", minPOI, 10);
 
     WallAdder wa(map, POImaxDist, POIminError, tolerance, minPOI);
     ros::Rate rate(10);

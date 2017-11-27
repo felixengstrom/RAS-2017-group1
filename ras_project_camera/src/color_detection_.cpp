@@ -20,8 +20,8 @@ public:
     cv::Mat frame;
     cv::Mat rgb_frame;
     cv::Mat hsv_frame;
-    cv::Scalar green_min, green_max,blue_min, blue_max, red_min, red_max,yellow_min, yellow_max;
-    cv::Scalar purple_min, purple_max, orange_min, orange_max, battery_min, battery_max;
+    cv::Scalar green_min, green_max,blue_min, blue_max, red_min, red_max,yellow_min, yellow_max; 
+    cv::Scalar purple_min, purple_max, orange_min, orange_max, battery_min, battery_max; 
     int green_h_max, green_s_max, green_v_max, green_h_min, green_s_min, green_v_min;
     int blue_h_max, blue_s_max, blue_v_max, blue_h_min, blue_s_min, blue_v_min;
     int red_h_max, red_s_max, red_v_max, red_h_min, red_s_min, red_v_min;

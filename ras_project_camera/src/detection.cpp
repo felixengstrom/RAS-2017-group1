@@ -39,7 +39,7 @@ public:
   {
     sub = nh.subscribe ("/camera/depth/points", 1, &detection::cloud_cb, this);
     pub_detected = nh.advertise<std_msgs::Bool>("/camera/detected",1);
-    pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/world_coord", 1);;
+    pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/pcl_coord", 1);;
     pub_pcl_filtered = nh.advertise<sensor_msgs::PointCloud2> ("camera/pcl_filtered", 1);
     
     ros::NodeHandle nh("~");
@@ -108,31 +108,33 @@ int main (int argc, char** argv)
         seg.setModelType (pcl::SACMODEL_PLANE);
         seg.setMethodType (pcl::SAC_RANSAC);
         seg.setDistanceThreshold (0.01);
-
-        int i = 0, nr_points = (int) cloud_filtered->points.size ();
-        // While 30% of the original cloud is still there
-        while (cloud_filtered->points.size () > 0.3 * nr_points)
+        for (int k=0; k<2; ++k)
         {
-          // Segment the largest planar component from the remaining cloud
-          seg.setInputCloud (cloud_filtered);
-          seg.segment (*inliers, *coefficients);
-          if (inliers->indices.size () == 0)
+          int i = 0, nr_points = (int) cloud_filtered->points.size ();
+          // While 30% of the original cloud is still there
+          while (cloud_filtered->points.size () > 0.3 * nr_points)
           {
-            std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
-            break;
-          }
-          // Extract the inliers
-          extract.setInputCloud (cloud_filtered);
-          extract.setIndices (inliers);
-          extract.setNegative (false);
-          extract.filter (*cloud_p);
-          //std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
+            // Segment the largest planar component from the remaining cloud
+            seg.setInputCloud (cloud_filtered);
+            seg.segment (*inliers, *coefficients);
+            if (inliers->indices.size () == 0)
+            {
+              std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
+              break;
+            }
+            // Extract the inliers
+            extract.setInputCloud (cloud_filtered);
+            extract.setIndices (inliers);
+            extract.setNegative (false);
+            extract.filter (*cloud_p);
+            //std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
 
-          // Create the filtering object
-          extract.setNegative (true);
-          extract.filter (*cloud_f);
-          cloud_filtered.swap (cloud_f);
-          i++;
+            // Create the filtering object
+            extract.setNegative (true);
+            extract.filter (*cloud_f);
+            cloud_filtered.swap (cloud_f);
+            i++;
+          }
         }
         // is the point cloud an object
         int object_size = cloud_filtered->width * cloud_filtered->height;
@@ -164,14 +166,14 @@ int main (int argc, char** argv)
           float x = z_point;
           float y = x_point;
           float z = y_point;
-          std::cerr << "x y z " << x <<" "<< y <<" "<< z << std::endl;
+          //std::cerr << "x y z " << x <<" "<< y <<" "<< z << std::endl;
           
           coord_from_camera.x = x;
           coord_from_camera.y = y;
           coord_from_camera.z = z;
-          std::cerr << " object coords " << x << " " << y << " " << z << std::endl;
-          
-          }
+          std::cerr << " object coords " << x << " " << y << " " << z << std::endl;  
+        }
+
         else 
         {
           detected.data = 0;
@@ -190,9 +192,9 @@ int main (int argc, char** argv)
         clock_gettime(CLOCK_MONOTONIC, &finish);
         elapsed = (finish.tv_sec - start.tv_sec);
         elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-        std::cerr << "time of one loop "<< elapsed << std::endl;
+        //std::cerr << "time of one loop "<< elapsed << std::endl;
         loop_rate.sleep();
         
-        }
+      }
   return 0;
 }
