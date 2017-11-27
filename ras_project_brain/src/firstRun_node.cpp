@@ -15,8 +15,8 @@
 #define OBJ_DETECTION_STATE 1
 #define OBJ_UPDATION_STATE 2
 #define START_EXIT_PREPARATION 3
-#define GO_TO_OBJECT 3
-#define REACH_GOAL 4
+#define GO_TO_OBJECT 4
+#define REACH_GOAL 5
 
 struct object_details
 {
@@ -48,8 +48,9 @@ public:
         i = j = 0;
         exploration_start_stop = 0;
         exploration_completion = 0;
+        item_num = 0;
         object_detected_current = object_detected_prev = 0;
-        objectDistanceGoal_old = 0.0;
+        objectDistanceGoal_old = 200.0;
         start_coordCalc = 0;
         start_pcl = 0;
         slowMotor_toUpdate = 0;
@@ -193,21 +194,35 @@ public:
             switch(current_state_exit)
             {
                 case START_EXIT_PREPARATION:
-                /* Find the object closer to the goal */
-                for (int obj=0;obj<i;obj++)
-                {
-                    objectDistanceGoal_new = sqrt((list[obj].location.x)*(list[obj].location.x)+
-                                              (list[obj].location.y)*(list[obj].location.y));
-                    if (objectDistanceGoal_new>=objectDistanceGoal_old)
+                    /* Find the object closer to the goal */
+                    for (int obj=0;obj<i;obj++)
                     {
-                        objectDistanceGoal_old = objectDistanceGoal_new;
+                        objectDistanceGoal_new = sqrt((list[obj].location.x)*(list[obj].location.x)+
+                                                  (list[obj].location.y)*(list[obj].location.y));
+                        if (objectDistanceGoal_new <= objectDistanceGoal_old)
+                        {
+                            objectDistanceGoal_old = objectDistanceGoal_new;
+                            item_num = obj;
+                        }
                     }
-                }
+                    msg_robotDestination.header.frame_id = "map";
+                    msg_robotDestination.header.stamp = ros::Time::now();
+                    msg_robotDestination.point.x = list[item_num].location.x;
+                    msg_robotDestination.point.y = list[item_num].location.y;
+                    msg_robotDestination.point.z = 0.0;
+                    robot_destination_publisher.publish(msg_robotDestination);
+                break;
+                case GO_TO_OBJECT:
+                    /*if the position is reached*/
+                    /*check if that is the object to be picked up*/
+                break;
+
             }
             msg_robotDestination.header.frame_id = "map";
             msg_robotDestination.header.stamp = ros::Time::now();
             msg_robotDestination.point.x = 0.0;
-            msg_robotDestination.point.x = 0.0;
+            msg_robotDestination.point.y = 0.0;
+            msg_robotDestination.point.z = 0.0;
             robot_destination_publisher.publish(msg_robotDestination);
         }
     }
@@ -225,6 +240,7 @@ private:
     bool slowMotor_toUpdate, exploration_start_stop, pickup_object,exploration_completion;
     int current_state, previous_state;
     int current_state_exit, previous_state_exit;
+    int item_num;
     float objectDistanceGoal_new,objectDistanceGoal_old;
     std_msgs::String msg_eSpeak_string;
     geometry_msgs::PointStamped msg_robotDestination;
