@@ -62,7 +62,7 @@ class Exploration
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
 		void SwitchCallback(const std_msgs::Bool::ConstPtr& msg)
-		{ GO = msg->data; GO_once = true; return; }
+		{ GO = msg->data; GO_once = true; if(msg->data == false) GO_once = false; return; }
 		//Exploration Stratergy Function
 		double calc_explored();
 		void direction_search();

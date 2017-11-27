@@ -5,6 +5,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_datatypes.h>
 #include <math.h>
+#include <std_msgs/Bool.h>
 class PathFollowing
 {
 	private:
@@ -12,6 +13,8 @@ class PathFollowing
 		ros::Publisher motor_pub;
 		ros::Subscriber teleop_sub;
 		ros::Subscriber odometry_sub;
+		ros::Subscriber stop_sub;
+		ros::Subscriber slowdown_sub;
 		geometry_msgs::PoseArray poses;
 		int closest_line;
 		int nb_poses;
@@ -20,9 +23,10 @@ class PathFollowing
 		ros::Time teleopTime;
 		float (*vectors)[2];
 		float D;
+		float normal_speed;
 		float speed;
-		bool first;
-        bool updated;
+	bool stop;
+	bool first;
    	//Desired velocity is relative to the traveling distance min maxed
    	double v_max, v_min;
    	//Desired angular velocity is relative to the angle differnce min maxed
@@ -35,7 +39,7 @@ class PathFollowing
    	double theta_error, distance_error;
 
 	public:
-		PathFollowing() : angle_ok(0), distance_ok(0), updated(false)
+	PathFollowing() : angle_ok(0), distance_ok(0)
 	{
 		theta_error = 0.1; //0.05
 		distance_error = 0.01; //0.01
@@ -43,51 +47,73 @@ class PathFollowing
 		v_max = 0.5; // 0.2
 		vGain = 0.5; //  1
 		D = 0.3;
-		speed = 0.1;
+		normal_speed = 0.2;
+		speed = 0.2;
 		w_min = 0.1; // previosu was 0.5, testing 0.4
 		w_max = 0.6; // previous was 06
 		wGain = 0.6; // from the fact that pi = 3.14 , pi*0.2 = 0.628 roughly
+		stop = true;
 		first = false;
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();
     		teleop_sub = n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
     		odometry_sub = n.subscribe("/robot/pose", 10, &PathFollowing::odometryCallback,this);
+		stop_sub = n.subscribe("/robot/stop", 10, &PathFollowing::stopCallback,this);
+		slowdown_sub = n.subscribe("/pathFollow/slowDown", 10, &PathFollowing::slowdownCallback,this);
     		motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
 	}
 		void teleopCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
 		void odometryCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+		void stopCallback(const std_msgs::Bool::ConstPtr& msg);
+		void slowdownCallback(const std_msgs::Bool::ConstPtr& msg);
 };
+
+void PathFollowing::slowdownCallback(const std_msgs::Bool::ConstPtr& msg) {
+	if (msg->data == true)
+	    speed = 0.1;
+	else
+	    speed = normal_speed;
+}
 
 void PathFollowing::teleopCallback (const geometry_msgs::PoseArray::ConstPtr& msg) {
 	ros::Time cur = msg->header.stamp;
 	if(cur != teleopTime)
 	{
+	    first = true;
+	    if (stop == false)
+		delete vectors;
+	    else
+	    	stop = false;
 	    teleopTime = cur;
   	    poses = *msg;
   	    closest_line = 0;
   	    nb_poses = poses.poses.size();
-     	    updated = true;
-	    first = true;
 	    vectors = new float[nb_poses-1][2];
 	    for (int i = 0; i < nb_poses-1; i++)
 	    {
-		if (i == 0)
-		    ROS_INFO("x1: %f - y1: %f ; x2: %f - y2: %f",poses.poses[0].position.x,poses.poses[0].position.y,poses.poses[1].position.x,poses.poses[1].position.y);
 	     	float length = std::sqrt(std::pow(poses.poses[i+1].position.x - poses.poses[i].position.x,2) + std::pow(poses.poses[i+1].position.y - poses.poses[i].position.y,2));
 	    	float x = poses.poses[i+1].position.x - poses.poses[i].position.x;
 	     	float y = poses.poses[i+1].position.y - poses.poses[i].position.y;
-		if (i == 0)
-		    ROS_INFO("Length: %f ; x: %f ; y: %f",length,x,y);
 	     	vectors[i][0] = x/length;
 	     	vectors[i][1] = y/length;
-		if (i == 0)
-		    ROS_INFO("Vecteur - x: %f ; y: %f",vectors[0][0], vectors[0][1]);
 	    }
 	}
 }
 
+void PathFollowing::stopCallback (const std_msgs::Bool::ConstPtr& msg) {
+	stop = msg->data;
+}
+
 void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {
-   if(!updated){return;} // should one add at least 0 velocity publish here?
+   if(stop)
+   {
+	geometry_msgs::Twist move;
+	move.linear.x = 0;
+	move.angular.z = 0;
+	motor_pub.publish(move);
+	return;
+   }
+   // should one add at least 0 velocity publish here?
    geometry_msgs::PoseStamped robot_pose = *msg;
    geometry_msgs::Twist move;
    float y_current = robot_pose.pose.position.y;
@@ -100,6 +126,29 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    tf::Matrix3x3 m(q);
    m.getRPY(roll,pitch,yaw);
    double theta_current =yaw;
+   if (first)
+   {
+	float angle_first_line = std::atan2(vectors[0][1], vectors[0][0]);
+	float angle_difference = theta_current - angle_first_line;
+	if (angle_difference > 0.2)
+	{
+	    geometry_msgs::Twist move;
+	    move.linear.x = 0;
+	    move.angular.z = -0.4;
+	    motor_pub.publish(move);
+	    return;
+	}
+	else if (angle_difference < -0.2)
+	{
+	    geometry_msgs::Twist move;
+	    move.linear.x = 0;
+	    move.angular.z = 0.4;
+	    motor_pub.publish(move);
+	    return;
+	}
+	else
+	    first = false;
+   }
    // Determine closest point to the path
    float smallest_distance = -1;
    float distance_line;
@@ -117,23 +166,14 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	    distance_line = projection_length;
 	}
    }
-//   float hypotenuse = std::sqrt(std::pow(poses.poses[closest_line].position.y-y_current, 2) + std::pow(poses.poses[closest_line].position.x-x_current, 2));
-//   float distance_line = std::sqrt(std::pow(hypotenuse,2) - std::pow(smallest_distance, 2));
-//   float distance_line = -(2.0*vectors[closest_line][0]*(poses.poses[closest_line].position.x-x_current)+2.0*vectors[closest_line][1]*(poses.poses[closest_line].position.y-y_current))/(2.0*(std::pow(vectors[closest_line][0],2)+std::pow(vectors[closest_line][1],2)));
    float closest_point[2];
    closest_point[0] = poses.poses[closest_line].position.x + distance_line*vectors[closest_line][0];
    closest_point[1] = poses.poses[closest_line].position.y + distance_line*vectors[closest_line][1];
-   if (first)
-   {
-   	ROS_INFO("Closest point on %d, x: %f; y: %f",closest_line,closest_point[0], closest_point[1]);
-   }
    // Find goal point which is a distance D away from closest_point on path
    float goal_point[2];
    int i;
    for (i = closest_line; i < nb_poses-1; i++)
    {
-	if (first)
-	    ROS_INFO("Vector %d, x: %f; y: %f",i ,vectors[i][0], vectors[i][1]);
         float a = std::pow(vectors[i][0],2) + std::pow(vectors[i][1],2);
         float b = 2.0*vectors[i][0]*(poses.poses[i].position.x - closest_point[0]) + 2.0*vectors[i][1]*(poses.poses[i].position.y - closest_point[1]);
         float c = std::pow(poses.poses[i].position.y-closest_point[1],2) + std::pow(poses.poses[i].position.x-closest_point[0],2) - std::pow(D,2);
@@ -154,13 +194,11 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 		{
 		    goal_point[0] = poses.poses[i].position.x + z*vectors[i][0];
 		    goal_point[1] = poses.poses[i].position.y + z*vectors[i][1];
-		    if (first)
-		    	ROS_INFO("Goal Point - x: %f, y: %f",goal_point[0],goal_point[1]);
 		    break;
 		}
 	}
    }
-   if (i == nb_poses)
+   if (i == nb_poses-1)
    {
 	goal_point[0] = poses.poses[i].position.x;
 	goal_point[1] = poses.poses[i].position.y;
@@ -169,19 +207,31 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    theta_current -= PI/2.0;
    float xgv = (goal_point[0] - x_current)*std::cos(theta_current) + (goal_point[1] - y_current)*std::sin(theta_current);
    float ygv = -(goal_point[0] - x_current)*std::sin(theta_current) + (goal_point[1] - y_current)*std::cos(theta_current);
-   if (first)
-   {
-	ROS_INFO("Robot - x: %f, y: %f",x_current, y_current);
-	ROS_INFO("Goal point robot - x: %f, y: %f",xgv,ygv);
-   }
    // Now we should calculate the curvature of the circle we want to follow to the point
    float curvature = 2*xgv/std::pow(D,2);
-   if (curvature == 0.0 && goal_point[0] == poses.poses[nb_poses-1].position.x && goal_point[1] == poses.poses[nb_poses-1].position.y)
+   ROS_INFO("YGV : %f",ygv);
+   if (ygv <= 0.01 && goal_point[0] == poses.poses[nb_poses-1].position.x && goal_point[1] == poses.poses[nb_poses-1].position.y)
    {
-	move.linear.x = 0;
-	move.angular.z = 0;
+	float angular_difference = theta_current + PI/2.0 - poses.poses[nb_poses-1].orientation.w;
+	if (angular_difference > 0.1)
+	{
+	    move.linear.x = 0;
+	    move.angular.z = -0.4;
+	}
+	else if (angular_difference < -0.1)
+	{
+	    move.linear.x = 0;
+	    move.angular.z = 0.4;
+	}
+	else
+	{
+	    move.linear.x = 0;
+	    move.angular.z = 0;
+	    stop = true;
+	    delete vectors;
+	}
    }
-   else if (curvature==0.0)
+   else if (xgv == 0.0)
    {
        move.linear.x = speed;
        move.angular.z = 0;
@@ -193,12 +243,6 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
        move.linear.x = speed;
        move.angular.z = -2*PI/time;
    }
-   
-   if (first)
-   {
-	ROS_INFO("Linear: %f, Angular: %f", move.linear.x, move.angular.z);
-   }
-   first = false;
    motor_pub.publish(move);
 }
 

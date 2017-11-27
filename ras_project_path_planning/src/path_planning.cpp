@@ -60,6 +60,7 @@ class PathPlanning
 		//Path Planning
 		std::map <int, int > cameFrom;
 		double x_start, y_start,x_goal,y_goal,w_goal;
+		ros::Time pathTime;
 		//Path Smoothing
 		std::vector<int> path_list;
 		//A* Heuristic wall avoiding value
@@ -181,7 +182,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 		if(i==path_list.size()-1) arp.orientation.w=w_goal;
 		following_points.poses.push_back(arp);
 	}
-	following_points.header.stamp = goal_update;
+	following_points.header.stamp =pathTime;
 	Path_pub.publish(wall_marker);
 	Path_follower_pub.publish(following_points);
 	}
@@ -286,15 +287,102 @@ int y_cell = (int)(y1/_res);
 
 int x_Start = (int)(x0/_res);
 int y_Start = (int)(y0/_res);
+if(x_cell+y_cell*_width < Csp.size() && x_cell+y_cell*_width >=0)
+{
 if(Csp[x_cell+y_cell*_width]!=0)
 {
 	ROS_INFO_STREAM("thats a wall");
-	return;
+int step = 1;
+bool loop=true; bool done = false;
+while(loop)
+{
+	for(int i = -step; i<=step;i+=2*step)
+	{
+	for(int j = -step; j<=step; j+=2*step)
+	{
+		
+			 if(x_cell+j+(y_cell+i)*_width < Csp.size() && x_cell+j+(y_cell+i)*_width >=0)
+			 {
+				if(Csp[x_cell+j+(y_cell+i)*_width]==0)
+				{
+					x_cell = x_cell +j;
+					y_cell = y_cell + i;
+					done=true; loop = false;
+					continue;
+				}
+			 }
+			 if(x_cell+i+(y_cell+j)*_width < Csp.size() && x_cell+i+(y_cell+j)*_width >=0)
+			 {
+				if(Csp[x_cell+i+(y_cell+j)*_width]==0)
+				{
+					x_cell = x_cell + i;
+					y_cell = y_cell + j;
+					done=true; loop = false;
+					continue;
+				}
+			}
+	}
+	}
+	step++;
+	if(step>10)
+	{return; ROS_INFO_STREAM("No goal point found in  " << step << " steps");}
 }
+}}
+else { ROS_INFO_STREAM(" given goal outside maze");return;}
+
+if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
+{
+	int step = 1;
+	if(Csp[x_Start + y_Start*_width]!=0)
+	{
+		bool loop=true; bool done = false;
+		while(loop)
+		{
+			for(int i = -step; i <= step; i+=2*step)
+			{
+			if(done) continue;
+				for(int j=-step; j<=step; j++)
+				{
+				 if(x_Start+j+(y_Start+i)*_width < Csp.size() && x_Start+j+(y_Start+i)*_width >=0)
+				 {
+					if(Csp[x_Start+j+(y_Start+i)*_width]==0)
+					{
+						x_Start = x_Start +j;
+						y_Start = y_Start + i;
+						done=true; loop = false;
+						continue;
+					}
+				 }
+				 if(x_Start+i+(y_Start+j)*_width < Csp.size() && x_Start+i+(y_Start+j)*_width >=0)
+				 {
+					if(Csp[x_Start+i+(y_Start+j)*_width]==0)
+					{
+						x_Start = x_Start + i;
+						y_Start = y_Start + j;
+						done=true; loop = false;
+						continue;
+					}
+				}
+
+			 	}
+			
+
+			}
+
+		step++;
+		if(step>10)
+		{loop=false; ROS_INFO_STREAM("No outside wall point in " << step << " steps");}
+		}
+		ROS_INFO_STREAM("Current Position in wall, taken the " << step << " closest point instead" );
+
+	}
+
+}
+else{ROS_INFO_STREAM("Start Position outside maze"); return;}
 //Reset values
 path_list.clear();
 cameFrom.clear();
-
+pathTime = ros::Time::now();
 
 
 std::map <int,point> openSet;

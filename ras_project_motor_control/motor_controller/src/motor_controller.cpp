@@ -15,7 +15,7 @@ float objDistance;
 double alpha_left, beta_left, proportion_left;
 double alpha_right, beta_right, proportion_right;
 
-const static int PI = acos(-1);
+const static double PI = acos(-1);
 
 class EncoderListener
 {
@@ -52,14 +52,16 @@ EncoderListener::EncoderListener( ros::NodeHandle& n_ )
     teleop_sub = n_.subscribe("motor_teleop/twist", 1, &EncoderListener::teleopCallback, this);
     last_change_right = 0;
     last_change_left = 0;
-    duration_left = 0;
-    duration_right = 0;
+    duration_left = 0.1;
+    duration_right = 0.1;
     last_reading_left.nsec = 0;
     last_reading_left.sec = 0;
     last_reading_right.nsec = 0;
     last_reading_right.sec = 0;
     last_count_right = 0;
     last_count_left = 0;
+    lin_vel_ = 0.0;
+    ang_vel_ = 0.0;
 }
 
 void EncoderListener::LeftEncoderCallback(const phidgets::motor_encoder::ConstPtr& msg)
@@ -97,8 +99,8 @@ void EncoderListener::RightEncoderCallback(const phidgets::motor_encoder::ConstP
 void EncoderListener::teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
 {
     //this->new_values = true;
-    lin_vel_ = msg->linear.x;
-    ang_vel_ = msg->angular.z;
+    lin_vel_ = std::max(std::min((double)(msg->linear.x), 1.0), -1.0);
+    ang_vel_ = std::max(std::min((double)(msg->angular.z), PI/2), -PI/2);
 }
 
 void objPositionMoveCallback(const std_msgs::Float32::ConstPtr& msg)
@@ -162,12 +164,6 @@ int main (int argc, char **argv)
     double alpha_right = 2.0;///5;//12
     double beta_right = 0.0;//30.0;///5;//20
     */
-    float last_v = 0;
-    float last_omega = 0;
-    float last_pwmr = 0;
-    float last_pwml = 0;
-    float pwm_right_float = 0;
-    float pwm_left_float = 0;
     while(ros::ok())
     {
 		ROS_INFO("--------------------------------------------------------------");
@@ -221,8 +217,8 @@ int main (int argc, char **argv)
             int_err_right += error_right*listener.duration_right;
 
 			//set max PWM values 100
-            pwm_left_float = std:: max(-100.0, (std::min(100.0, (proportion_left * desired_wl + alpha_left * error_left + beta_left * int_err_left))));
-            pwm_right_float =  std::max(-100.0, (std::min(100.0, (proportion_right * desired_wr + alpha_right * error_right + beta_right * int_err_right))));
+            float pwm_left_float = std:: max(-100.0, (std::min(100.0, (proportion_left * desired_wl + alpha_left * error_left + beta_left * int_err_left))));
+            float pwm_right_float =  std::max(-100.0, (std::min(100.0, (proportion_right * desired_wr + alpha_right * error_right + beta_right * int_err_right))));
     		if (abs(pwm_left_float)==100.0)
 			{
 				int_err_left -= error_left*listener.duration_left;
@@ -273,8 +269,8 @@ int main (int argc, char **argv)
             //lin_vel_ = ang_vel_ = 0;
             listener.last_change_left = 0;
             listener.last_change_right = 0;
-            listener.duration_left = 0;
-            listener.duration_right = 0;
+            //listener.duration_left = 0;
+            //listener.duration_right = 0;
         }
 		ros::spinOnce();
         loop_rate.sleep();

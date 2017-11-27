@@ -22,9 +22,9 @@ class classification(object):
         
         self.flag = 0
         self.cv_image = None
-        self.buffer_size = 52428800
+        #self.buffer_size = #52428800
         self.sub_object_detected = rospy.Subscriber('/camera/object_detected', Bool, self.object_detected_cb)
-        self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1, buff_size=self.buffer_size) #queue_size = 1,
+        self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 ) #queue_size = 1, buff_size=self.buffer_size
         self.pub_object_class = rospy.Publisher('/camera/object_class', String, queue_size = 1)
         self.bridge = CvBridge()
         
@@ -57,15 +57,17 @@ def main(args):
             # Input 
             # convert form cv:Mat to PIL
             pil_im = fromarray(cl.cv_image)
-            pil_im = pil_im.resize(size, resample=0)
+            pil_im = pil_im.resize(size) #, resample=0)
             x = image.img_to_array(pil_im)
-            x = np.expand_dims(x, axis=0)
             x = preprocess_input(x)
-            preds = model.predict(x)
+            x = np.expand_dims(x, axis=0)
+            preds = model.predict(x, steps = 1)
             #classes = ['Green Cude', 'Green Hollow Cylinder']
             classes = ['Blue Cube', 'Blue Hollow Triangle', 'Green Cude', 'Green Hollow Cube', 'Green Hollow Cylinder', 'No Object', 'Orange Hollow Cross', 'Orange Star', 'Purple Hollow Cross', 'Purple Star', 'Red Hollow Cube', 'Red Hollow Cylinder', 'Red Sphere', 'Yellow Cube', 'Yellow Sphere']
+            print (preds)
             pred = preds[0]
             print (pred)
+
             t1 = time.time()
             print("prediction time: {:0.3f}s".format(t1-t0))
             index, value = max(enumerate(pred), key=operator.itemgetter(1))

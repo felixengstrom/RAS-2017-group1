@@ -69,9 +69,8 @@ int main (int argc, char** argv)
   ros::Rate loop_rate(10);
   while (ros::ok())
   {
-    std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
+    //std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
     if (ic.object_detected && ic.has_cloud && ic.has_coord_msg)
-      //std::cerr << "object_detected" << ic.object_detected << std::endl;
       {
         int width = ic.point_pcl.width;
         int height = ic.point_pcl.height;
@@ -96,7 +95,7 @@ int main (int argc, char** argv)
         {
           pcl_index = (ic.pixel_y+dy[i])*width + (ic.pixel_x+dx[i]);
           p = ic.point_pcl.at(pcl_index);
-          std::cerr << "value was nan " << std::endl;
+          //std::cerr << "value was nan " << std::endl;
         } 
         
         float x, y, d, z;
