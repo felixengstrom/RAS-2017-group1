@@ -7,6 +7,6 @@
 	</node>
 	<node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node" output="screen"/>
 
-	<node pkg="ras_project_path_following" type="path_following" name="path_following"  />
-
+	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
+	<node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" output="screen"/>
 </launch>

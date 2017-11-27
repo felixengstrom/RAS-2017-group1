@@ -1,0 +1,8 @@
+<launch>
+
+<node pkg="ras_project_camera" name="camera_pcl" type="detection" output="screen"> 
+<param name="min_object_size" type="int" value="30" />
+<param name="max_object_size" type="int" value="1000" />
+</node>
+
+</launch>

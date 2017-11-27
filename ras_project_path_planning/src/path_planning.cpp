@@ -48,16 +48,18 @@ class PathPlanning
 		ros::Time gNow;
 		ros::Time tNow;
 		//map variables
-		float res;
-		int width_height;
+		float _res;
+		int _width,_height;
 		std::vector<int8_t> Csp;
+		bool initialized; // check if above values have been added!
+
 		//constant
 		static const double r=0.29/2; //0.274/2; //radius of robot
 		int cells; // amount of cells to be filled from a point
 
 		//Path Planning
 		std::map <int, int > cameFrom;
-		double x_start, y_start,x_goal,y_goal;
+		double x_start, y_start,x_goal,y_goal,w_goal;
 		//Path Smoothing
 		std::vector<int> path_list;
 		//A* Heuristic wall avoiding value
@@ -66,18 +68,18 @@ class PathPlanning
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): Csp(250*250), listener(), x_start(-1),y_start(-1), Wall_step(0), Wall_cost(0),Wall_tolerance(0)
+		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1), Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
-		n = ros::NodeHandle();
-		t_update=ros::Time::now();
-		goal_update=ros::Time::now();
-		curr_sub = n.subscribe("/robot/pose",10,&PathPlanning::CurrCallback,this);
-		OG_sub = n.subscribe("/maze_OccupancyGrid",10,&PathPlanning::OGCallback,this);
-		goal_sub= n.subscribe("/robot/goal",10,&PathPlanning::GoalCallback,this);
-		C_pub  = n.advertise<nav_msgs::OccupancyGrid>("maze_CSpace",1000);
-		Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
-		Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
+			n = ros::NodeHandle();
+			t_update=ros::Time::now();
+			goal_update=ros::Time::now();
+			curr_sub = n.subscribe("/robot/pose",10,&PathPlanning::CurrCallback,this);
+			OG_sub = n.subscribe("/maze_OccupancyGrid",10,&PathPlanning::OGCallback,this);
+			goal_sub= n.subscribe("/robot/goal",10,&PathPlanning::GoalCallback,this);
+			C_pub  = n.advertise<nav_msgs::OccupancyGrid>("//maze_CSpace",1000);
+			Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
+			Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
 		}
 		double checkwall(const int index_now);
    		double  heuristic(const point& p1, const point& p2);
@@ -93,7 +95,7 @@ class PathPlanning
 
 double PathPlanning::checkwall(const int index_now)
 {
-	int upper_limit = width_height*width_height;
+	int upper_limit = _width*_height;
 	int checkval;
 	double maxval;
 	int dx,dy;
@@ -103,7 +105,7 @@ double PathPlanning::checkwall(const int index_now)
 	{
 		for(int j=-1*Wall_step; j <= Wall_step; j++)
 		{
-		checkval= index_now + i + j*width_height;
+		checkval= index_now + i + j*_width;
 		if(checkval > upper_limit || checkval < 0){continue;}
 		if(Csp[checkval]!=0)
 			{
@@ -121,13 +123,14 @@ double PathPlanning::checkwall(const int index_now)
 }
 double PathPlanning::heuristic(const point& p1, const point& p2)
 {
-	int index_now=p1.x+p1.y*width_height;
+	int index_now=p1.x+p1.y*_width;
 	double cost;
 	cost = checkwall(index_now);
 	
 	return (double)(cost+sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2))); }
 void PathPlanning::loop_function()
 {
+if(initialized == false) return; // suspend loop until the OccupancyGrid is loaded
 
 if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	if(path_list.size()==0){
@@ -137,13 +140,13 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	if(path_list.size()>0){
 	ROS_INFO_STREAM("following smoothed path points were calculated (size of vector:  "<<path_list.size() << " ) ");
 	double Q0,W0,Q1,W1;
-	Q0=(path_list[0]%width_height)*res;
-	W0=(path_list[0]/width_height)*res;
+	Q0=(path_list[0]%_width)*_res;
+	W0=(path_list[0]/_width)*_res;
 	//PoseArray
 	geometry_msgs::PoseArray following_points;
 	geometry_msgs::Pose arp;
 	arp.position.x=Q0; arp.position.y=W0;
-//	following_points.poses.push_back(arp); commented out because starting position is redundant, and fucks with path foloowing
+	following_points.poses.push_back(arp); //commented out because starting position is redundant, and fucks with path foloowing
 
 
 	//wall_marker is for rviz
@@ -163,17 +166,19 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	wall_marker.pose.position.y = 0;
 	geometry_msgs::Point pnt;
 	pnt.x=Q0; pnt.y=W0;
+	ROS_INFO_STREAM(" x = " << Q0 << " y = " << W0);
 	wall_marker.points.push_back(pnt);
 	for(int i=1;i<path_list.size();i++)
 	{
 	
-		Q1=(path_list[i]%width_height)*res;
-		W1=(path_list[i]/width_height)*res;
+		Q1=(path_list[i]%_width)*_res;
+		W1=(path_list[i]/_width)*_res;
 		pnt.x=Q1;pnt.y=W1;
 		wall_marker.points.push_back(pnt);
 		ROS_INFO_STREAM(" x = " << Q1 << " y = " << W1);
 
 		arp.position.x=Q1; arp.position.y=W1;
+		if(i==path_list.size()-1) arp.orientation.w=w_goal;
 		following_points.poses.push_back(arp);
 	}
 	following_points.header.stamp = goal_update;
@@ -188,40 +193,36 @@ void PathPlanning::GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
 	if(goal_update!=gNow)
 	{
 		goal_update=gNow;
-	//tf::StampedTransform transform;
-	//listener.lookupTransform("/robot","/map",ros::Time(0),transform);
-	//x_start=transform.getOrigin().x();
-	//y_start=transform.getOrigin().y();
-
 	x_goal=msg->pose.position.x;
 	y_goal=msg->pose.position.y;
+	w_goal=msg->pose.orientation.w;
 	path_list.clear(); // New goal, reset path list computed
 	ROS_INFO_STREAM("New Goal Recieved! goal x : "<< x_goal << " goal y : " << y_goal << " path_list.size : " << path_list.size());
-//	Path(x_start,y_start,x_goal,y_goal);
 	}
-
-
-//
 
 }
 void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
-	
+	if(initialized==false)
+	{
+
+		_res=msg->info.resolution;
+		_width= msg->info.width;
+		_height=msg->info.height;
+		initialized=true;
+		Csp = std::vector<int8_t>(_width*_height);
+	}
 	 tNow= msg->info.map_load_time;
 	if(tNow != t_update)
 	{
 	t_update=tNow;
-	//reset Csp
-	std::fill(Csp.begin(), Csp.end(), 0);
 	//Reset
 	path_list.clear(); // new map, new path needed (keep in mind its not a new goal)
 	std::vector<int8_t>OG=msg->data;
-	res=msg->info.resolution;
-	width_height=msg->info.width;
 	//if(Csp.size() != width_height*width_height){ Csp.resize(width_height*width_height);}
 	
 	//Cspace creation
-	cells=(int)(r/res);
+	cells=(int)(r/_res);
 	int i,y,x;
 	for(i=0;i<OG.size();i++)
 		{
@@ -235,20 +236,20 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 					for(x=0;x<=cells; x++)
 					{
 						//X forward Y up
-						if(i+x+y*width_height<(width_height*width_height))
-						{Csp[i+x+y*width_height]=100;}
+						if(i+x+y*_width<(_width*_height))
+						{Csp[i+x+y*_width]=100;}
 						//ROS_INFO_STREAM("I got here when x = " << x << " y = " << y );	}
 						//X backward Y up
-						if(i-x+y*width_height<(width_height*width_height) && i-x+y*width_height>=0)
-						{Csp[i-x+y*width_height]=100;}
+						if(i-x+y*_width<(_height*_width) && i-x+y*_width>=0)
+						{Csp[i-x+y*_width]=100;}
 						 
 						//X forward Y down
-						if(i+x-y*width_height<width_height*width_height && i+x-y*width_height>=0)
-						{Csp[i+x-y*width_height]=100;}
+						if(i+x-y*_width<_width*_height && i+x-y*_width>=0)
+						{Csp[i+x-y*_width]=100;}
 						
 						///X backward Y down
-						if(i-x-y*width_height>=0)
-						{Csp[i-x-y*width_height]=100;}
+						if(i-x-y*_width>=0)
+						{Csp[i-x-y*_width]=100;}
 					}
 				}
 			}
@@ -262,9 +263,9 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 	}
 
 	nav_msgs::OccupancyGrid C_space;
-	C_space.info.resolution=res;
-	C_space.info.width = width_height;
-	C_space.info.height= width_height;
+	C_space.info.resolution=_res;
+	C_space.info.width = _width;
+	C_space.info.height= _height;
 	C_space.info.map_load_time = t_update;
 	C_space.info.origin=msg->info.origin;
 	C_space.data=Csp;
@@ -280,12 +281,12 @@ void PathPlanning::Path(double x0, double y0, double x1, double y1)
 double rt2 = sqrt(2);
 //int x,y; //Goal pos in meter
 //int x0,y0; // Current Robot position from Odometry
-int x_cell = (int)(x1/res);
-int y_cell = (int)(y1/res);
+int x_cell = (int)(x1/_res);
+int y_cell = (int)(y1/_res);
 
-int x_Start = (int)(x0/res);
-int y_Start = (int)(y0/res);
-if(Csp[x_cell+y_cell*width_height]!=0)
+int x_Start = (int)(x0/_res);
+int y_Start = (int)(y0/_res);
+if(Csp[x_cell+y_cell*_width]!=0)
 {
 	ROS_INFO_STREAM("thats a wall");
 	return;
@@ -307,7 +308,7 @@ startpos.x=x_Start;
 startpos.y=y_Start;
 startpos.g=0;
 startpos.f=startpos.g+heuristic(startpos,goalpos);
-int tmp1=startpos.x+width_height*startpos.y;
+int tmp1=startpos.x+_width*startpos.y;
 openSet.insert(std::pair<int,point>(tmp1,startpos));
 cameFrom.insert(std::pair<int,int>(tmp1,tmp1));
 std::map<int,point> closeSet;
@@ -323,7 +324,7 @@ while(openSet.size()!=0)
 	int D = element->first;
 //ROS_INFO_STREAM("at least got here i= "<< amount << " D = " << D);
 	point current= openSet[D];
-	int curr_index = current.x+current.y*width_height;
+	int curr_index = current.x+current.y*_width;
 	if(current.x==goalpos.x && current.y==goalpos.y)
 	{Reconstruct_path(curr_index);return;}
 	closeSet.insert(std::pair<int,point>(curr_index,current));
@@ -334,9 +335,9 @@ while(openSet.size()!=0)
 		for(int j=-1;j<=1;j++)
 		{
 			if(i==0 && j==0){continue;}
-			int iter_index = curr_index+j+i*width_height;
+			int iter_index = curr_index+j+i*_width;
 		//	ROS_INFO_STREAM("iter_index = " << iter_index << "CSP OF IT = " << (int)Csp[iter_index]);
-			if(iter_index < 0 || iter_index > width_height*width_height) {continue;} //out of bound
+			if(iter_index < 0 || iter_index > _width*_height) {continue;} //out of bound
 			if(Csp[iter_index]!=0){continue;}//check for wall / obstacle
 			
 			if(closeSet.find(iter_index)!=closeSet.end()){continue;}//check if already exist in closedset
@@ -409,10 +410,10 @@ bool PathPlanning::Checkline(int start, int goal)
 	//Bresenham's Line algorithm
 	int x0,y0,x1,y1;
 
-	x0=start%width_height;
-	y0=(int)(start/width_height);
-	x1=goal%width_height;
-	y1=(int)(goal/width_height);
+	x0=start%_width;
+	y0=(int)(start/_width);
+	x1=goal%_width;
+	y1=(int)(goal/_width);
 	int X0,Y0,X1,Y1;
 	if(x1>=x0)
 	{
@@ -449,8 +450,8 @@ bool PathPlanning::Checkline(int start, int goal)
 	{
 		while(Y!=Y1)
 		{
-			if(checkwall(width_height*Y+X)>WallT){return false;}
-			if(Csp[width_height*Y+X]!=0){return false;}//found wall
+	//		if(checkwall(_width*Y+X)>WallT){return false;}
+			if(Csp[_width*Y+X]!=0){return false;}//found wall
 			Y=Y+step;
 		}
 	}
@@ -459,8 +460,8 @@ bool PathPlanning::Checkline(int start, int goal)
 
 		while(X!=X1)
 		{
-			if(checkwall(width_height*Y+X)>WallT){return false;}
-			if(Csp[width_height*Y+X]!=0){return false;}//found wall
+	//		if(checkwall(_width*Y+X)>WallT){return false;}
+			if(Csp[_width*Y+X]!=0){return false;}//found wall
 			X=X+1;
 		}
 	}
@@ -471,15 +472,15 @@ bool PathPlanning::Checkline(int start, int goal)
 	
 		if(p>=0)
 		{
-			if(checkwall(width_height*Y+X)>WallT){return false;}
-			if(Csp[width_height*Y+X]!=0){return false;}//found wall
+	//		if(checkwall(_width*Y+X)>WallT){return false;}
+			if(Csp[_width*Y+X]!=0){return false;}//found wall
 			Y=Y+step;
 			p=p+B;
 		}
 		else
 		{
-			if(checkwall(width_height*Y+X)>WallT){return false;}
-			if(Csp[width_height*Y+X]!=0){return false;}//found wall
+	//		if(checkwall(_width*Y+X)>WallT){return false;}
+			if(Csp[_width*Y+X]!=0){return false;}//found wall
 			p=p+A;
 		}
 		X=X+1;
@@ -499,15 +500,15 @@ bool PathPlanning::Checkline(int start, int goal)
 		
 			if(p>=0)
 			{
-				if(checkwall(width_height*Y+X)>WallT){return false;}
-				if(Csp[width_height*Y+X]!=0){return false;}//found wall
+	//			if(checkwall(_width*Y+X)>WallT){return false;}
+				if(Csp[_width*Y+X]!=0){return false;}//found wall
 				X=X+1;
 				p=p+B;
 			}
 			else
 			{
-				if(checkwall(width_height*Y+X)>WallT){return false;}
-				if(Csp[width_height*Y+X]!=0){return false;}//found wall
+	//			if(checkwall(_width*Y+X)>WallT){return false;}
+				if(Csp[_width*Y+X]!=0){return false;}//found wall
 				p=p+A;
 			}
 			Y=Y+step;

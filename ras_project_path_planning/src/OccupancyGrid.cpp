@@ -30,15 +30,16 @@ class OccupancyGrid
 		ros::Subscriber wall_sub; // the subscriber that add wall to the existing Occupancy grid
 		ros::Subscriber object_sub;// The subscriber that add obstacle (and object)?
 		//OccupancyGrid Data
-		nav_msgs::OccupancyGrid OG;
 		//----------------------//
 		std::string _map_file; // Name of Map file
 		std::string _map_OG; // Name of publishing topic
 		bool initialized;
     		//MAP Variables
 		float _res;
-		float _size;
-		int _width_height;
+		int _width,_height;
+		std::vector<int8_t> data;
+    		geometry_msgs::Pose _origin;
+		ros::Time stamp, map_load_time;
 		//-----------//
 		//Obect add variables
 		double object_size;
@@ -55,13 +56,13 @@ class OccupancyGrid
 	public:
 		OccupancyGrid() : initialized(false), _map_OG("/maze_OccupancyGrid"),n("~")
 		{
-    		OG_pub= n.advertise<nav_msgs::OccupancyGrid>( _map_OG,0);
 		Map_initialize();
 		//Object add variable initialization
 		n.param<double>("object_size",object_size,0.04);
 		n.param<double>("battery_x",battery_x,0.15);
 		n.param<double>("battery_y",battery_y,0.06);
 		n.param<double>("obstacle_size",obstacle_size,0.1);
+    		OG_pub= n.advertise<nav_msgs::OccupancyGrid>( _map_OG,0);
 		wall_sub = n.subscribe("/wall_add",10,&OccupancyGrid::WallCallback,this);
 		object_sub = n.subscribe("/object_add",10,&OccupancyGrid::ObjectCallback,this);
 		}
@@ -72,7 +73,7 @@ class OccupancyGrid
 };
 bool OccupancyGrid::Map_initialize()
 {
-
+if(initialized==true) return true;
 
     n.param<std::string>("map_file", _map_file, "maze_map.txt");
     std::ifstream map_fs; map_fs.open(_map_file.c_str());
@@ -81,30 +82,56 @@ bool OccupancyGrid::Map_initialize()
         return false;
     }
 
-    OG.header.stamp = ros::Time::now(); // Time() before
-    OG.header.frame_id= "/map";
-
-    OG.info.map_load_time= ros::Time::now(); // Time() before
+    stamp = ros::Time::now(); // Time() before
+    map_load_time= ros::Time::now(); // Time() before
     
 // -------- Initialize map variable OG ----- //    
     //Initialize size and resolution of map
     n.param<float>("grid_resolution",_res, (float)0.01); 
-    n.param<float>("maze_size",_size,(float)2.5);
-    _width_height= (int)(_size/_res);
-    OG.info.resolution = _res;
-    OG.info.width = _width_height;
-    OG.info.height = _width_height;
-    std::vector<int8_t> _data(_width_height*_width_height);
-    OG.data=_data; // initialize free map
+    std::string line1;
+    double mw,mh;
+    mw=0;mh=0;
+    while (getline(map_fs, line1)){
+
+        if (line1[0] == '#') {
+            // comment -> skip
+            continue;
+        }
+
+        double max_num = std::numeric_limits<double>::max();
+        double x1= max_num,
+               x2= max_num,
+               y1= max_num,
+               y2= max_num;
+
+        std::istringstream line_stream(line1);
+
+        line_stream >> x1 >> y1 >> x2 >> y2;
+
+        if ((x1 == max_num) || ( x2 == max_num) || (y1 == max_num) || (y2 == max_num)){
+            ROS_WARN("Segment error. Skipping line: %s",line1.c_str()); continue;
+        }
+    	if(x1 != max_num && x1 > mw) mw = x1;
+	if(x2 != max_num && x2 > mw) mw = x2;
+	
+    	if(y1 != max_num && y1 > mw) mh = y1;
+	if(y2 != max_num && y2 > mw) mh = y2;
+    }
+	mw= mw + (double)_res;
+	mh= mh + (double) _res;
+    
+    _width = (int)(mw/_res);
+    _height = (int)(mh/_res);
+    data.assign(_width*_height,0);
     //Initialize origin of map
-    geometry_msgs::Pose _origin;
+     _origin;
 
     _origin.position.x=0; _origin.position.y=0; _origin.position.z=0;
     _origin.orientation.x=0;_origin.orientation.y=0; _origin.orientation.z=0; _origin.orientation.w=0;
-    OG.info.origin=_origin;    
 // ---------------------------------------- //
 // ------------Draw Walls from original MAP file-----------//
-
+    map_fs.clear();
+    map_fs.seekg(0,std::ios::beg);
     std::string line;
     while (getline(map_fs, line)){
 
@@ -133,6 +160,7 @@ bool OccupancyGrid::Map_initialize()
     
     }
     initialized=true;
+    map_fs.close();
 }
 
 
@@ -170,8 +198,12 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 	{
 		while(Y!=Y1)
 		{
-			OG.data[_width_height*Y+X]=(int8_t)100;
+			if(_width*Y+X <data.size())
+			{
+			data[_width*Y+X]=(int8_t)100;
+			}
 			Y=Y+step;
+			
 		}
 	}
 	else if(dY==0)
@@ -179,9 +211,12 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 
 		while(X!=X1)
 		{
-			OG.data[_width_height*Y+X]=(int8_t)100;
+			if(_width*Y+X <data.size())
+			{
+			data[_width*Y+X]=(int8_t)100;
+			}
 			X=X+1;
-		}
+		}	
 	}
 	else if(dY/dX<=1)
 	{
@@ -190,13 +225,18 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 	
 		if(p>=0)
 		{
-			OG.data[_width_height*Y+X]=(int8_t)100;
+			if(_width*Y+X <data.size())
+			{
+			data[_width*Y+X]=(int8_t)100;
+			}
 			Y=Y+step;
 			p=p+B;
 		}
 		else
 		{
-			OG.data[_width_height*Y+X]=(signed char)100;
+			if(_width*Y+X <data.size())
+			data[_width*Y+X]=(signed char)100;
+			
 			p=p+A;
 		}
 		X=X+1;
@@ -214,19 +254,22 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(p>=0)
 			{
-				OG.data[_width_height*Y+X]=(int8_t)100;
+				if(_width*Y+X <data.size())
+				data[_width*Y+X]=(int8_t)100;
+				
 				X=X+1;
 				p=p+B;
 			}
 			else
 			{
-				OG.data[_width_height*Y+X]=(signed char)100;
+				if(_width*Y+X <data.size())
+				data[_width*Y+X]=(signed char)100;
+				
 				p=p+A;
 			}
 			Y=Y+step;
 		}
 	}
-
 }
 void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 {
@@ -236,8 +279,8 @@ void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 	{
 		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y);
 		
-    		OG.info.map_load_time= ros::Time::now(); // Time() before
-    		OG.header.stamp= ros::Time::now(); // Time() before
+		stamp = ros::Time::now();
+    		map_load_time= ros::Time::now(); // Time() before
 	}
 	else ROS_INFO_STREAM("Wall Message recieved should be Two points!");
 }
@@ -255,8 +298,22 @@ void OccupancyGrid::ObjectCallback(const  geometry_msgs::PoseStamped::ConstPtr& 
 }
 void OccupancyGrid::loop_function()
 {
-	
+	if(initialized)
+	{
+
+	nav_msgs::OccupancyGrid OG;
+    	OG.info.resolution = _res;
+    	OG.info.width = _width;
+    	OG.info.height = _height;
+    	OG.info.origin=_origin;    
+    	OG.data=data; // initialize free map
+    	OG.header.stamp = stamp; // Time() before
+    	OG.header.frame_id= "/map";
+
+    	OG.info.map_load_time= map_load_time; // Time() before
 	OG_pub.publish(OG);
+
+	}
 }
 int main(int argc, char **argv)
 {
