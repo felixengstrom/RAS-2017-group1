@@ -76,6 +76,7 @@ class Exploration
 		void direction_search();
 		void random_search();		
 		void CheckDirection(const double x1, const double y1, const double x2, const double y2);
+		void WallAvoidance(int wall_dist);
 	public:
 
 		Exploration() : Exp_initialized(false),GO_once(false),GO(false),Csp_received(false)
@@ -101,6 +102,62 @@ class Exploration
 		void loop_function();
 
 };
+void Exploration::WallAvoidance(int wall_dist)
+{
+	int xCsp = goal_pos.pose.position.x /Csp.info.resolution;
+	int yCsp = goal_pos.pose.position.y /Csp.info.resolution;
+	int index = xCsp + yCsp*Csp.info.width;
+	std::vector<int>indexPoints;
+	bool loop;
+	loop = false;
+	for(int i = -wall_dist; i <= wall_dist; i++)
+	{
+		for(int j = -wall_dist; i <= wall_dist; i++)
+		{
+			if(index+j+i*Csp.info.width < Csp.data.size() && index+j+i*Csp.info.width >=0)
+			{
+				if(Csp.data[index+j+i*Csp.info.width]!=0)
+					loop = true; //a close wall exist;
+				else
+				indexPoints.push_back(index+j+i*Csp.info.width);
+			}
+		}
+	}
+	if(loop==false){return;}
+	while(loop)
+	{
+	index = indexPoints.back(); indexPoints.pop_back();
+	loop = false;
+	for(int i = -wall_dist; i <= wall_dist; i++)
+	{
+		for(int j = -wall_dist; i <= wall_dist; i++)
+		{
+			if(index+j+i*Csp.info.width < Csp.data.size() && index+j+i*Csp.info.width >=0)
+			{
+				if(Csp.data[index+j+i*Csp.info.width]!=0)
+					loop = true;
+				else
+				{
+				if(std::find(indexPoints.begin(),indexPoints.end(),index+j+i*Csp.info.width) == indexPoints.end())
+					indexPoints.push_back(index+j+i*Csp.info.width);
+			
+				}
+			}
+		}
+	}
+	if(indexPoints.size()>300)
+	{	
+		loop = false;
+		ROS_INFO_STREAM("TOO MUCH!!!");
+		return;
+	}
+	}
+	xCsp = index % Csp.info.width;
+	yCsp = index / Csp.info.width;
+	goal_pos.pose.position.x = xCsp*Csp.info.resolution;
+	goal_pos.pose.position.y = yCsp*Csp.info.resolution;
+	return;
+}
 double Exploration::calc_explored() //This function calculate and returns the percentage of the map that have been discovered
 {
 	int Map_size = Exp.data.size();
@@ -370,9 +427,10 @@ if(Exp_initialized==true)
 	{ random_search(); }
 	if(GO_once && Done.data == false)
 	{
-		Goal_SC.request.goalPoint.header = goal_pos.header;
-		Goal_SC.request.goalPoint.point = goal_pos.pose.position;
-		dest_client.call(Goal_SC);
+		//Goal_SC.request.goalPoint.header = goal_pos.header;
+		//Goal_SC.request.goalPoint.point = goal_pos.pose.position;
+		//dest_client.call(Goal_SC);
+		WallAvoidance(2); // Recheck the goal_pos to be input [cm] from wall
 		Dest_pub.publish(goal_pos);
 	}
 	
