@@ -10,6 +10,8 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
+#include<ras_project_brain/SetGoalPoint.h>
+
 //C++
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +43,9 @@ class Exploration
 		ros::Publisher Dest_pub; //Destination publisher
 		ros::Publisher eMap_pub; // Published explored path so far
 		ros::Publisher done_pub; //Publishes True when done, false while not done
+		//Service: Client
+		ros::ServiceClient dest_client;
+		
 		//--------------------//
 		//State Variable  
 		ros::Time t_update;
@@ -48,6 +53,7 @@ class Exploration
 		bool Exp_initialized;
 		double xNow,yNow,wNow; //Current Position (pose)
 		geometry_msgs::PoseStamped goal_pos;
+		ras_project_brain::SetGoalPoint Goal_SC;
 		double max_x,max_y; //the maximus size of the maze , in meters
 		nav_msgs::OccupancyGrid Csp;
 		bool Csp_received;		
@@ -89,6 +95,7 @@ class Exploration
 			Dest_pub = n.advertise<geometry_msgs::PoseStamped>("/robot/goal",0);	
 			eMap_pub = n.advertise<nav_msgs::OccupancyGrid>("/Explored_map",0);
 			done_pub = n.advertise<std_msgs::Bool>("/Explored/done",0);
+			dest_client = n.serviceClient<ras_project_brain::SetGoalPoint>("set_robot_goal");
 		}
 
 		void loop_function();
@@ -104,8 +111,9 @@ double Exploration::calc_explored() //This function calculate and returns the pe
 			explored++;
 
 	}
-
-	return (double)(explored/Map_size);
+	double percentage =(double)(explored)/((double)Map_size);
+	ROS_INFO_STREAM("WE have explored: " << percentage);
+	return percentage;
 }
 void Exploration::random_search() // Random search based on current explored
 {
@@ -344,25 +352,31 @@ void Exploration::loop_function()
 if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
-	if(calc_explored() >= 0.5)
+	double percentage_explored = calc_explored();
+	if(percentage_explored >0.5)
 	{
 		Done.data = true;
-
 	}
 	else
 	{
 		Done.data = false;
-	if(GO && Csp_received)
+	}
+	if(GO && Csp_received && Done.data == false)
 	{
 		random_search();
 		GO=false;
 	}
+
 	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.2 && Csp_received)
 	{ random_search(); }
-	if(GO_once)
+	if(GO_once && Done.data == false)
+	{
+		//Goal_SC.request.goalPoint.header = goal_pos.header;
+		//Goal_SC.request.goalPoint.point = goal_pos.pose.position;
+		//dest_client.call(Goal_SC);
 		Dest_pub.publish(goal_pos);
-
 	}
+	
 	done_pub.publish(Done);
 }
 return;
