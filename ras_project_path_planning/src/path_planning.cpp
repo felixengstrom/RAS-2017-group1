@@ -54,7 +54,7 @@ class PathPlanning
 		bool initialized; // check if above values have been added!
 
 		//constant
-		static const double r=0.29/2; //0.274/2; //radius of robot
+		static const double r=0.30/2; //0.274/2; //radius of robot
 		int cells; // amount of cells to be filled from a point
 
 		//Path Planning

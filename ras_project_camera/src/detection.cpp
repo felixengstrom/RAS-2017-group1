@@ -39,7 +39,7 @@ public:
   {
     sub = nh.subscribe ("/camera/depth/points", 1, &detection::cloud_cb, this);
     pub_detected = nh.advertise<std_msgs::Bool>("/camera/detected",1);
-    pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/pcl_coord", 1);;
+    pub_world_coord = nh.advertise<geometry_msgs::Point> ("/camera/detection_coord", 1);;
     pub_pcl_filtered = nh.advertise<sensor_msgs::PointCloud2> ("camera/pcl_filtered", 1);
     
     ros::NodeHandle nh("~");

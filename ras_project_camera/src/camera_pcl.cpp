@@ -31,32 +31,33 @@ public:
   ros::Publisher pub_world_coord;
   bool object_detected;
   
-  camera_pcl(): point_pcl(), object_detected(), pixel_x(100), pixel_y(200)
+  camera_pcl(): point_pcl(), object_detected(), pixel_x(100), pixel_y(200), has_coord_msg(0), has_cloud(0)
   {
     sub = nh.subscribe ("/camera/depth_registered/points", 1, &camera_pcl::cloud_cb, this);
     sub_object_coord = nh.subscribe("/camera/object_coord", 100, &camera_pcl::object_coord_cb, this);
     sub_object_detected = nh.subscribe("/camera/object_detected", 1, &camera_pcl::detectionCb, this);
-    pub_world_coord = nh.advertise<geometry_msgs::Point> ("camera/world_coord", 100);
+    pub_world_coord = nh.advertise<geometry_msgs::Point> ("/camera/world_coord", 100);
   }
 
   void detectionCb(const std_msgs::Bool::ConstPtr& msg)
   {
     object_detected = msg->data;
-    //std::cerr << "object_detected" << object_detected << std::endl;
+    std::cerr << "object_detected" << object_detected << std::endl;
   }
 
   void object_coord_cb (const geometry_msgs::Point::ConstPtr& object_coord_msg)
   {
     pixel_x = object_coord_msg->x;
     pixel_y = object_coord_msg->y;
-    //std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
+    std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
     has_coord_msg = true;
   }
 
   void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
   {
     pcl::fromROSMsg(*cloud_msg, point_pcl);
-    has_cloud = true;  
+    has_cloud = true;
+    std::cerr << "has cloud " << has_cloud << std::endl;  
   }
 
 };
@@ -69,7 +70,7 @@ int main (int argc, char** argv)
   ros::Rate loop_rate(10);
   while (ros::ok())
   {
-    //std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
+    std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
     if (ic.object_detected && ic.has_cloud && ic.has_coord_msg)
       {
         int width = ic.point_pcl.width;
