@@ -134,7 +134,7 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	{
 	    geometry_msgs::Twist move;
 	    move.linear.x = 0;
-	    move.angular.z = -0.4;
+	    move.angular.z = -0.6;
 	    motor_pub.publish(move);
 	    return;
 	}
@@ -142,7 +142,7 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	{
 	    geometry_msgs::Twist move;
 	    move.linear.x = 0;
-	    move.angular.z = 0.4;
+	    move.angular.z = 0.6;
 	    motor_pub.publish(move);
 	    return;
 	}
@@ -216,12 +216,12 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
 	if (angular_difference > 0.1)
 	{
 	    move.linear.x = 0;
-	    move.angular.z = -0.4;
+	    move.angular.z = -0.6;
 	}
 	else if (angular_difference < -0.1)
 	{
 	    move.linear.x = 0;
-	    move.angular.z = 0.4;
+	    move.angular.z = 0.6;
 	}
 	else
 	{

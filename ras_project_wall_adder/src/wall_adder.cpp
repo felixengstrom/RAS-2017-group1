@@ -360,7 +360,7 @@ int main(int argc, char*argv[])
     float POIminError;
     nh.param<float>("POIminError", POIminError, 0.1);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 0);
+    nh.param<int>("tolerance", tolerance, 2);
     int minPOI;
     nh.param<int>("minPOI", minPOI, 10);
 
