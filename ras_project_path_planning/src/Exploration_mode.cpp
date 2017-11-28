@@ -423,7 +423,8 @@ if(Exp_initialized==true)
 		random_search();
 		GO=false;
 	}
-	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.15 && Csp_received)
+
+	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.2 && Csp_received)
 	{ random_search(); }
 	if(GO_once && Done.data == false)
 	{

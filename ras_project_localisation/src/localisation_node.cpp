@@ -160,10 +160,10 @@ void ParticleFilter::resample_particles()
         int ind = cumulative.upper_bound(uni)->second;
         //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
-        newPs[i].x += vel_noise(rng)*0.1;
-        newPs[i].y += vel_noise(rng)*0.1;
+        newPs[i].x += vel_noise(rng)*0.2;
+        newPs[i].y += vel_noise(rng)*0.2;
         newCh[i] = particles.channels[ind];
-        newCh[i].values[0] += vel_noise(rng)*0.1;
+        newCh[i].values[0] += vel_noise(rng)*0.2;
     }
 
     particles.points = newPs;
