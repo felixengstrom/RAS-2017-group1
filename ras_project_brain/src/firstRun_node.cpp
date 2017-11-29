@@ -100,7 +100,7 @@ public:
     void pExplorationStateMachine()
     {
 
-        if (ros::Time::now()- begin <= ros::Duration(60.0*5) && exploration_completion!=1 )
+        if (ros::Time::now()- begin <= ros::Duration(60.0*3) && exploration_completion!=1 )
         {
             ROS_INFO("In state exploration");
             //continue exploration
@@ -243,13 +243,13 @@ public:
             }
         }
     }
-
+/*
     void pDestinationPublisher(geometry_msgs::PointStamped* destination)
     {
         msg_robotDestination.header = destination->header;
         msg_robotDestination.point = destination->point;
         robot_destination_publisher.publish(msg_robotDestination);
-    }
+    }*/
 
 private:
     std::string classString;
@@ -268,7 +268,7 @@ private:
     int i,j;
 };
 
-bool setGoal(ras_project_brain::SetGoalPoint::Request  &req, ras_project_brain::SetGoalPoint::Response &res)
+/*bool setGoal(ras_project_brain::SetGoalPoint::Request  &req, ras_project_brain::SetGoalPoint::Response &res)
 {
     FirstRunNode* first_run_obj = new FirstRunNode;
     geometry_msgs::PointStamped final_goal;
@@ -282,7 +282,7 @@ bool setGoal(ras_project_brain::SetGoalPoint::Request  &req, ras_project_brain::
     res.error = 0;
     delete first_run_obj;
     return true;
-}
+}*/
 
 int main(int argc, char **argv)
 {
@@ -290,7 +290,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "firstRun_node");
 
   FirstRunNode first_run_node;
-  ros::ServiceServer service = first_run_node.n.advertiseService("set_robot_goal", setGoal);
+ // ros::ServiceServer service = first_run_node.n.advertiseService("set_robot_goal", setGoal);
 
   /* Runs at a frequency of 10Hz */
   ros::Rate loop_rate(10);

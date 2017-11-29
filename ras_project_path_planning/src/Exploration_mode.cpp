@@ -491,7 +491,8 @@ if(msg->header.stamp != Csp.header.stamp)
 {
  Csp = *msg;
  if(Csp_received==false)
- {	 Add_WallExplored();
+ {	 
+	 Add_WallExplored();
  }
  Csp_received = true;
 }

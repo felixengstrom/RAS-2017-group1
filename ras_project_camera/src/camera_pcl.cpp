@@ -70,6 +70,7 @@ int main (int argc, char** argv)
   ros::Rate loop_rate(10);
   while (ros::ok())
   {
+    geometry_msgs::Point coord_from_camera;
     std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
     if (ic.object_detected && ic.has_cloud && ic.has_coord_msg)
       {
@@ -99,19 +100,20 @@ int main (int argc, char** argv)
           //std::cerr << "value was nan " << std::endl;
         } 
         
-        float x, y, d, z;
+        float x, y, z;
         x = p.z;
         y = p.x;
         z = p.y;
         std::cerr << "x y z " << x <<" "<< y <<" "<< z << std::endl;
 
-        geometry_msgs::Point coord_from_camera;
+        //geometry_msgs::Point coord_from_camera;
         coord_from_camera.x = x;
         coord_from_camera.y = y;
         coord_from_camera.z = z;
-        ic.pub_world_coord.publish (coord_from_camera);
-       
+        //ic.pub_world_coord.publish (coord_from_camera);
       }
+
+      ic.pub_world_coord.publish(coord_from_camera);
       ros::spinOnce();
       loop_rate.sleep();
     }
