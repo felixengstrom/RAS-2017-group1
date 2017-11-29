@@ -59,6 +59,7 @@ class Exploration
 		bool Csp_received;		
 		bool GO,GO_once;
 		std_msgs::Bool Done; //publish Done when done.
+		int Explore_amount;
 		//-------------------------//
 		
 		//Parameters Initializeable with n.param//
@@ -77,7 +78,7 @@ class Exploration
 		void random_search();		
 		void CheckDirection(const double x1, const double y1, const double x2, const double y2);
 		void WallAvoidance(int wall_dist);
-		void Add_WallExplored()
+		void Add_WallExplored();
 	public:
 
 		Exploration() : Exp_initialized(false),GO_once(false),GO(false),Csp_received(false)
@@ -105,14 +106,44 @@ class Exploration
 };
 void Exploration::Add_WallExplored()
 {
-
-int mapsize = Csp.data.size();
-for(int i = 0; i<mapsize;i++)
+int x_ratio = Csp.info.width/Exp.info.width;
+int y_ratio = Csp.info.height/Exp.info.height;
+int gridsize = x_ratio * y_ratio;
+int mapsize = Exp.data.size();
+int i,j,xExp,yExp,xCsp,yCsp;
+int add; double percentage;
+int amount_added = 0;
+for(i = 0; i<mapsize;i++) // i is the Exp map index
 {
+	xExp = i % Exp.info.width;
+	yExp = i / Exp.info.width;
+	xCsp = xExp * x_ratio;
+	yCsp = yExp * y_ratio;
+	j = xCsp + yCsp*Csp.info.width;
+	add = 0;
+	for(int k = 0; k < y_ratio; k++)
+	{
+		for(int l = 0; l < x_ratio; l++)
+		{
+			if(j+l+k*Csp.info.width <Csp.data.size() && j+l+k*Csp.info.width >0 ) //sanity check
+			{
+				if(Csp.data[j+l+k*Csp.info.width] ==100)
+					add++;
+			}
+		}
+	}
+		
+	percentage = (((double)add)/((double)gridsize));
+	if(percentage >= 0.5)
+	{
+		Exp.data[i] = 100;
+		amount_added++;
+	}
 
-
+	
 
 }
+Explore_amount = amount_added;
 }
 void Exploration::WallAvoidance(int wall_dist)
 {
@@ -180,7 +211,7 @@ double Exploration::calc_explored() //This function calculate and returns the pe
 			explored++;
 
 	}
-	double percentage =(double)(explored)/((double)Map_size);
+	double percentage =(double)(explored- Explore_amount)/((double)(Map_size-Explore_amount));
 	ROS_INFO_STREAM("WE have explored: " << percentage);
 	return percentage;
 }
@@ -422,9 +453,10 @@ if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
 	double percentage_explored = calc_explored();
-	if(percentage_explored >0.5)
+	if((percentage_explored) >0.5)
 	{
 		Done.data = true;
+		ROS_INFO_STREAM("We have now explored the amount specified. Done message is now true");
 	}
 	else
 	{
@@ -459,7 +491,8 @@ if(msg->header.stamp != Csp.header.stamp)
 {
  Csp = *msg;
  if(Csp_received==false)
- {	// Add_WallExplored();}
+ {	 Add_WallExplored();
+ }
  Csp_received = true;
 }
 }

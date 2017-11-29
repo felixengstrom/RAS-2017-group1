@@ -298,33 +298,34 @@ while(loop)
 {
 	for(int i = -step; i<=step;i+=2*step)
 	{
-	for(int j = -step; j<=step; j+=2*step)
-	{
-		
-			 if(x_cell+j+(y_cell+i)*_width < Csp.size() && x_cell+j+(y_cell+i)*_width >=0)
-			 {
-				if(Csp[x_cell+j+(y_cell+i)*_width]==0)
-				{
-					x_cell = x_cell +j;
-					y_cell = y_cell + i;
-					done=true; loop = false;
-					continue;
-				}
-			 }
-			 if(x_cell+i+(y_cell+j)*_width < Csp.size() && x_cell+i+(y_cell+j)*_width >=0)
-			 {
-				if(Csp[x_cell+i+(y_cell+j)*_width]==0)
-				{
-					x_cell = x_cell + i;
-					y_cell = y_cell + j;
-					done=true; loop = false;
-					continue;
-				}
-			}
-	}
+	if(done) continue;
+		for(int j = -step; j<=step; j++)
+		{
+			
+				 if(x_cell+j+(y_cell+i)*_width < Csp.size() && x_cell+j+(y_cell+i)*_width >=0)
+				 {
+					if(Csp[x_cell+j+(y_cell+i)*_width]==0)
+					{
+						x_cell = x_cell +j;
+						y_cell = y_cell + i;
+						done=true; loop = false;
+						continue;
+					}
+				 }
+				 if(x_cell+i+(y_cell+j)*_width < Csp.size() && x_cell+i+(y_cell+j)*_width >=0)
+				 {
+					if(Csp[x_cell+i+(y_cell+j)*_width]==0)
+					{
+						x_cell = x_cell + i;
+						y_cell = y_cell + j;
+						done=true; loop = false;
+						continue;
+					}
+				 }
+		}
 	}
 	step++;
-	if(step>10)
+	if(step>100)
 	{return; ROS_INFO_STREAM("No goal point found in  " << step << " steps");}
 }
 }}
@@ -370,7 +371,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 			}
 
 		step++;
-		if(step>10)
+		if(step>100)
 		{loop=false; ROS_INFO_STREAM("No outside wall point in " << step << " steps");}
 		}
 		ROS_INFO_STREAM("Current Position in wall, taken the " << step << " closest point instead" );
