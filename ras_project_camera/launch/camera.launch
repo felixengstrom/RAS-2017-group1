@@ -1,13 +1,16 @@
 <launch>
 
-<!--<include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch" />-->
+<node name="camera_broadcaster" pkg="ras_project_camera" type="camera_tf_node">
+</node>
 
-<!--<include file="$(find zbar_ros)/launch/QR_reader.launch" />-->
+<include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch" />
+
+<include file="$(find zbar_ros)/launch/QR_reader.launch" />
 
 <node pkg="ras_project_camera" name="detection" type="detection" output="screen">
 <param name="min_object_size" type="int" value="30" />
 <param name="min_obstacle_size" type="int" value="250" />
-</node> 
+</node>
 
 <node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen" respawn="true" cwd="node">
 
@@ -25,16 +28,16 @@
 <param name="blue_s_min" type="int" value="100"/>
 <param name="blue_v_min" type="int" value="30"/>
 
-<param name="yellow_h_max" type="int" value="110"/>
+<param name="yellow_h_max" type="int" value="120"/>
 <param name="yellow_s_max" type="int" value="255"/>
 <param name="yellow_v_max" type="int" value="255"/>
 <param name="yellow_h_min" type="int" value="80"/>
-<param name="yellow_s_min" type="int" value="30"/>
-<param name="yellow_v_min" type="int" value="20"/>
+<param name="yellow_s_min" type="int" value="10"/>
+<param name="yellow_v_min" type="int" value="10"/>
 
 <param name="red_h_max" type="int" value="135"/>
-<param name="red_s_max" type="int" value="245"/>
-<param name="red_v_max" type="int" value="240"/>
+<param name="red_s_max" type="int" value="250"/>
+<param name="red_v_max" type="int" value="250"/>
 <param name="red_h_min" type="int" value="115"/>
 <param name="red_s_min" type="int" value="50"/>
 <param name="red_v_min" type="int" value="50"/>
@@ -68,7 +71,7 @@
 <node pkg="ras_project_camera" name="camera_pcl" type="camera_pcl" output="screen"> 
 </node>
 
-<node pkg="ras_project_camera" name="classification"  type="classification_backup.py" output="screen"> 
-</node>
+<!--<node pkg="ras_project_camera" name="classification"  type="classification_backup.py" output="screen"> 
+</node>-->
 
 </launch>

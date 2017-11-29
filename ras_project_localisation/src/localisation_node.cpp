@@ -160,10 +160,10 @@ void ParticleFilter::resample_particles()
         int ind = cumulative.upper_bound(uni)->second;
         //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
-        newPs[i].x += vel_noise(rng)*0.1;
-        newPs[i].y += vel_noise(rng)*0.1;
+        newPs[i].x += vel_noise(rng)*0.2;
+        newPs[i].y += vel_noise(rng)*0.2;
         newCh[i] = particles.channels[ind];
-        newCh[i].values[0] += vel_noise(rng)*0.1;
+        newCh[i].values[0] += vel_noise(rng)*0.2;
     }
 
     particles.points = newPs;
@@ -218,6 +218,7 @@ void ParticleFilter::update_lastPose()
     double mean_y = 0;
     double sum_sin = 0;
     double sum_cos = 0;
+
     for ( int i = 0; i < nParticles; i++)
     {
         mean_x += particles.points[i].x;
@@ -385,8 +386,8 @@ int main(int argc, char*argv[])
     
 
     ros::NodeHandle n;
-    ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 100);
-    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("/localisation/pose", 10);
+    ros::Publisher parts = n.advertise<sensor_msgs::PointCloud>("particles", 1);
+    ros::Publisher truepose = n.advertise<geometry_msgs::PoseStamped>("/localisation/pose", 1);
 
 
     double x_start;

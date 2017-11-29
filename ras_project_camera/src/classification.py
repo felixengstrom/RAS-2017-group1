@@ -23,7 +23,7 @@ class classification(object):
         self.flag = 0
         self.cv_image = None
         #self.buffer_size = #52428800
-        self.sub_object_detected = rospy.Subscriber('/camera/object_detected', Bool, self.object_detected_cb)
+        self.sub_object_detected = rospy.Subscriber('/camera/classify', Bool, self.object_detected_cb)
         self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 ) #queue_size = 1, buff_size=self.buffer_size
         self.pub_object_class = rospy.Publisher('/camera/object_class', String, queue_size = 1)
         self.bridge = CvBridge()
@@ -49,7 +49,7 @@ def main(args):
     model = load_model(model_dir)
     print('model loaded')
     size = (224, 224)
-    r = rospy.Rate(0.5)
+    r = rospy.Rate(5)
 
     while not rospy.is_shutdown():
         if (cl.flag == True):
@@ -59,12 +59,12 @@ def main(args):
             pil_im = fromarray(cl.cv_image)
             pil_im = pil_im.resize(size) #, resample=0)
             x = image.img_to_array(pil_im)
-            x = preprocess_input(x)
+            #x = preprocess_input(x)
             x = np.expand_dims(x, axis=0)
             preds = model.predict(x, steps = 1)
             #classes = ['Green Cude', 'Green Hollow Cylinder']
             classes = ['Blue Cube', 'Blue Hollow Triangle', 'Green Cude', 'Green Hollow Cube', 'Green Hollow Cylinder', 'No Object', 'Orange Hollow Cross', 'Orange Star', 'Purple Hollow Cross', 'Purple Star', 'Red Hollow Cube', 'Red Hollow Cylinder', 'Red Sphere', 'Yellow Cube', 'Yellow Sphere']
-            print (preds)
+            #print (preds)
             pred = preds[0]
             print (pred)
 

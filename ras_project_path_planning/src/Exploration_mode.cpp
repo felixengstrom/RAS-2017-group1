@@ -10,6 +10,8 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
+#include<ras_project_brain/SetGoalPoint.h>
+
 //C++
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +42,10 @@ class Exploration
 		//Path Publisher
 		ros::Publisher Dest_pub; //Destination publisher
 		ros::Publisher eMap_pub; // Published explored path so far
+		ros::Publisher done_pub; //Publishes True when done, false while not done
+		//Service: Client
+		ros::ServiceClient dest_client;
+		
 		//--------------------//
 		//State Variable  
 		ros::Time t_update;
@@ -47,10 +53,13 @@ class Exploration
 		bool Exp_initialized;
 		double xNow,yNow,wNow; //Current Position (pose)
 		geometry_msgs::PoseStamped goal_pos;
+		ras_project_brain::SetGoalPoint Goal_SC;
 		double max_x,max_y; //the maximus size of the maze , in meters
 		nav_msgs::OccupancyGrid Csp;
 		bool Csp_received;		
 		bool GO,GO_once;
+		std_msgs::Bool Done; //publish Done when done.
+		int Explore_amount;
 		//-------------------------//
 		
 		//Parameters Initializeable with n.param//
@@ -62,18 +71,22 @@ class Exploration
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
 		void SwitchCallback(const std_msgs::Bool::ConstPtr& msg)
-		{ GO = msg->data; GO_once = true; if(msg->data == false) GO_once = false; return; }
+		{  GO_once = msg->data;  return; }
 		//Exploration Stratergy Function
 		double calc_explored();
 		void direction_search();
 		void random_search();		
 		void CheckDirection(const double x1, const double y1, const double x2, const double y2);
+		void WallAvoidance(int wall_dist);
+		void Add_WallExplored();
 	public:
 
-		Exploration() : Exp_initialized(false),GO_once(false),GO(false),Csp_received(false)
+		Exploration() : Exp_initialized(false),GO_once(false),GO(true),Csp_received(false)
 		{
+
 			//Initialize
 			n = ros::NodeHandle();
+			Done.data=false;
 			Csp.header.stamp = ros::Time::now();
 			n.param<int>("resolution_cutting",resolution_cutting,10);
 			n.param<double>("foward_margin",forward_exp,0.2);
@@ -84,12 +97,110 @@ class Exploration
 			curr_sub = n.subscribe("/robot/pose",10,&Exploration::CurrCallback,this);
 			Dest_pub = n.advertise<geometry_msgs::PoseStamped>("/robot/goal",0);	
 			eMap_pub = n.advertise<nav_msgs::OccupancyGrid>("/Explored_map",0);
-			
+			done_pub = n.advertise<std_msgs::Bool>("/Explored/done",0);
+			dest_client = n.serviceClient<ras_project_brain::SetGoalPoint>("set_robot_goal");
 		}
 
 		void loop_function();
 
 };
+void Exploration::Add_WallExplored()
+{
+int x_ratio = Csp.info.width/Exp.info.width;
+int y_ratio = Csp.info.height/Exp.info.height;
+int gridsize = x_ratio * y_ratio;
+int mapsize = Exp.data.size();
+int i,j,xExp,yExp,xCsp,yCsp;
+int add; double percentage;
+int amount_added = 0;
+for(i = 0; i<mapsize;i++) // i is the Exp map index
+{
+	xExp = i % Exp.info.width;
+	yExp = i / Exp.info.width;
+	xCsp = xExp * x_ratio;
+	yCsp = yExp * y_ratio;
+	j = xCsp + yCsp*Csp.info.width;
+	add = 0;
+	for(int k = 0; k < y_ratio; k++)
+	{
+		for(int l = 0; l < x_ratio; l++)
+		{
+			if(j+l+k*Csp.info.width <Csp.data.size() && j+l+k*Csp.info.width >0 ) //sanity check
+			{
+				if(Csp.data[j+l+k*Csp.info.width] ==100)
+					add++;
+			}
+		}
+	}
+		
+	percentage = (((double)add)/((double)gridsize));
+	if(percentage >= 0.5)
+	{
+		Exp.data[i] = 100;
+		amount_added++;
+	}
+
+	
+
+}
+Explore_amount = amount_added;
+}
+void Exploration::WallAvoidance(int wall_dist)
+{
+	int xCsp = goal_pos.pose.position.x /Csp.info.resolution;
+	int yCsp = goal_pos.pose.position.y /Csp.info.resolution;
+	int index = xCsp + yCsp*Csp.info.width;
+	std::vector<int>indexPoints;
+	bool loop;
+	loop = false;
+	for(int i = -wall_dist; i <= wall_dist; i++)
+	{
+		for(int j = -wall_dist; j<= wall_dist; j++)
+		{
+			if(index+j+i*Csp.info.width < Csp.data.size() && index+j+i*Csp.info.width >=0)
+			{
+				if(Csp.data[index+j+i*Csp.info.width]!=0)
+					loop = true; //a close wall exist;
+				else
+				indexPoints.push_back(index+j+i*Csp.info.width);
+			}
+		}
+	}
+	if(loop==false){return;}
+	while(loop)
+	{
+	index = indexPoints.back(); indexPoints.pop_back();
+	loop = false;
+	for(int i = -wall_dist; i <= wall_dist; i++)
+	{
+		for(int j = -wall_dist; j <= wall_dist; j++)
+		{
+			if(index+j+i*Csp.info.width < Csp.data.size() && index+j+i*Csp.info.width >=0)
+			{
+				if(Csp.data[index+j+i*Csp.info.width]!=0)
+					loop = true;
+				else
+				{
+				if(std::find(indexPoints.begin(),indexPoints.end(),index+j+i*Csp.info.width) == indexPoints.end())
+					indexPoints.push_back(index+j+i*Csp.info.width);
+			
+				}
+			}
+		}
+	}
+	if(indexPoints.size()>300)
+	{	
+		loop = false;
+		ROS_INFO_STREAM("TOO MUCH!!!");
+		return;
+	}
+	}
+	xCsp = index % Csp.info.width;
+	yCsp = index / Csp.info.width;
+	goal_pos.pose.position.x = xCsp*Csp.info.resolution;
+	goal_pos.pose.position.y = yCsp*Csp.info.resolution;
+	return;
+}
 double Exploration::calc_explored() //This function calculate and returns the percentage of the map that have been discovered
 {
 	int Map_size = Exp.data.size();
@@ -100,8 +211,9 @@ double Exploration::calc_explored() //This function calculate and returns the pe
 			explored++;
 
 	}
-
-	return (double)(explored/Map_size);
+	double percentage =(double)(explored- Explore_amount)/((double)(Map_size-Explore_amount));
+	ROS_INFO_STREAM("WE have explored: " << percentage);
+	return percentage;
 }
 void Exploration::random_search() // Random search based on current explored
 {
@@ -340,23 +452,48 @@ void Exploration::loop_function()
 if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
-
-	if(GO && Csp_received)
+	double percentage_explored = calc_explored();
+	if((percentage_explored) >0.5)
+	{
+		Done.data = true;
+		ROS_INFO_STREAM("We have now explored the amount specified. Done message is now true");
+	}
+	else
+	{
+		Done.data = false;
+	}
+	if(GO && GO_once && Csp_received && Done.data == false) //Initial random search, when initialized, GO=false makes sure its only run once
 	{
 		random_search();
 		GO=false;
 	}
-	if(GO_once)
-		Dest_pub.publish(goal_pos);
 
+	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.2 && Csp_received) //New random goal generated when sufficiently close to the previous one
+	{ random_search(); }
+	if(GO_once && Done.data == false)
+	{
+		//Goal_SC.request.goalPoint.header = goal_pos.header;
+		//Goal_SC.request.goalPoint.point = goal_pos.pose.position;
+		//dest_client.call(Goal_SC);
+		WallAvoidance(2); // Recheck the goal_pos to be input [cm] from wall
+		Dest_pub.publish(goal_pos);
+	}
+	
+	done_pub.publish(Done);
 }
 return;
 }
 void Exploration::CspCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
+if(Exp_initialized==false)
+	return;
 if(msg->header.stamp != Csp.header.stamp)
 {
  Csp = *msg;
+ if(Csp_received==false)
+ {	 
+	 Add_WallExplored();
+ }
  Csp_received = true;
 }
 }

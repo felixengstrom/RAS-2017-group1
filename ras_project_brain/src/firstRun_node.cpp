@@ -109,7 +109,7 @@ public:
     void pExplorationStateMachine()
     {
 
-        if (ros::Time::now()- begin <= ros::Duration(60.0*5) && exploration_completion!=1 )
+        if (ros::Time::now()- begin <= ros::Duration(60.0*3) && exploration_completion!=1 )
         {
             ROS_INFO("In state exploration");
             //continue exploration

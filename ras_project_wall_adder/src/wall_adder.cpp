@@ -19,6 +19,7 @@ struct Line{
     float x2;
     float y1;
     float y2;
+    int type;
 };
 class WallAdder{
     private:
@@ -165,9 +166,9 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         if (lidar_range < POImaxDist and map_range-lidar_range > POIminError ) {
             dists[i] = truey.ranges[i];
             pointsOfInterest[i] = 1;
-        }else {
-            //ROS_INFO("diff %f, lidar %f, map %f, i %d",
-            //         std::abs(lidar_range-map_range),  lidar_range, map_range, i);
+        }else if (map_range-lidar_range > POIminError ){
+            pointsOfInterest[i] = -1;
+        }else{
             pointsOfInterest[i] = 0;
             dists[i] = std::numeric_limits<double>::infinity();
         }
@@ -180,10 +181,16 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     int count = 0;
     int countMax = 0;
     int tol = tolerance;
+    int type = 0;
+    int typeMax = 0;
 
+    // Check for walls to add
     for(int i = 0; i<pointsOfInterest.size(); i++)
     {
-        if (pointsOfInterest[i])
+
+        // If the point of interest has the same as the current type or it is
+        // the first POI
+        if (pointsOfInterest[i] == type or type==0)
         {
             if (counting)
             {
@@ -193,7 +200,8 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
             else
             {
                 first = i;
-                counting = true;
+                counting = true;;
+                type = pointsOfInterest[i];
                 count++;
             }
         }
@@ -211,11 +219,13 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                        countMax = count;
                        lastMax = last;
                        firstMax = first;
+                       typeMax = type;
                     }
 
                     count = 0;
                     counting = false;
                     tol = tolerance;
+                    type=0;
                 }
             }
         }
@@ -360,7 +370,7 @@ int main(int argc, char*argv[])
     float POIminError;
     nh.param<float>("POIminError", POIminError, 0.1);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 0);
+    nh.param<int>("tolerance", tolerance, 2);
     int minPOI;
     nh.param<int>("minPOI", minPOI, 10);
 
@@ -373,6 +383,4 @@ int main(int argc, char*argv[])
         rate.sleep();
 
     }
-
-    ros::spin();
 }
