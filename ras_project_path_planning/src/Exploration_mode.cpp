@@ -77,7 +77,7 @@ class Exploration
 		void random_search();		
 		void CheckDirection(const double x1, const double y1, const double x2, const double y2);
 		void WallAvoidance(int wall_dist);
-		void Add_WallExplored()
+		void Add_WallExplored();
 	public:
 
 		Exploration() : Exp_initialized(false),GO_once(false),GO(false),Csp_received(false)
@@ -459,7 +459,8 @@ if(msg->header.stamp != Csp.header.stamp)
 {
  Csp = *msg;
  if(Csp_received==false)
- {	// Add_WallExplored();}
+ {	// Add_WallExplored();
+ }
  Csp_received = true;
 }
 }

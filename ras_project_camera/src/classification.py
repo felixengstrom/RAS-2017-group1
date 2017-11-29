@@ -23,7 +23,7 @@ class classification(object):
         self.flag = 0
         self.cv_image = None
         #self.buffer_size = #52428800
-        self.sub_object_detected = rospy.Subscriber('/camera/object_detected', Bool, self.object_detected_cb)
+        self.sub_object_detected = rospy.Subscriber('/camera/classify', Bool, self.object_detected_cb)
         self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 ) #queue_size = 1, buff_size=self.buffer_size
         self.pub_object_class = rospy.Publisher('/camera/object_class', String, queue_size = 1)
         self.bridge = CvBridge()
