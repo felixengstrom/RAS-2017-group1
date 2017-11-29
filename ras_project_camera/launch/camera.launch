@@ -5,12 +5,12 @@
 
 <include file="$(find realsense_camera)/launch/sr300_nodelet_rgbd.launch" />
 
-<include file="$(find zbar_ros)/launch/QR_reader.launch" />
+<!--<include file="$(find zbar_ros)/launch/QR_reader.launch" />-->
 
-<node pkg="ras_project_camera" name="detection" type="detection" output="screen">
+<!--<node pkg="ras_project_camera" name="detection" type="detection" output="screen" respawn="true">
 <param name="min_object_size" type="int" value="30" />
 <param name="min_obstacle_size" type="int" value="250" />
-</node>
+</node>-->
 
 <node name="color_detection" pkg="ras_project_camera" type="color_detection" output="screen" respawn="true" cwd="node">
 
@@ -68,10 +68,10 @@
 <param name="maxTargetRadius" type="int" value="250"/>
 </node>
 
-<node pkg="ras_project_camera" name="camera_pcl" type="camera_pcl" output="screen"> 
-</node>
+<!--<node pkg="ras_project_camera" name="camera_pcl" type="camera_pcl" output="screen" respawn="true"> 
+</node>-->
 
-<!--<node pkg="ras_project_camera" name="classification"  type="classification_backup.py" output="screen"> 
+<!--<node pkg="ras_project_camera" name="classification"  type="classification_backup.py" output="screen" respawn="true"> 
 </node>-->
 
 </launch>

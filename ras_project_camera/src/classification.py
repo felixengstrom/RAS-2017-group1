@@ -23,7 +23,8 @@ class classification(object):
         self.flag = 0
         self.cv_image = None
         #self.buffer_size = #52428800
-        self.sub_object_detected = rospy.Subscriber('/camera/classify', Bool, self.object_detected_cb)
+        self.sub_object_detected = rospy.Subscriber('/camera/object_detected', Bool, self.object_detected_cb)
+        self.sub_detected = rospy.Subscriber('/camera/detected', Bool, self.detected_cb)
         self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 ) #queue_size = 1, buff_size=self.buffer_size
         self.pub_object_class = rospy.Publisher('/camera/object_class', String, queue_size = 1)
         self.bridge = CvBridge()
@@ -31,7 +32,10 @@ class classification(object):
         rospy.loginfo("subscribed to /camera/image/image_raw")
 
     def object_detected_cb(self, msg):
-        self.flag = msg.data
+        self.object_detected = msg.data
+        #rospy.loginfo("object flag %i", self.flag)
+    def detected_cb(self, msg):
+        self.detected = msg.data
         #rospy.loginfo("object flag %i", self.flag)
 
     def image_cb (self, img):
@@ -52,7 +56,7 @@ def main(args):
     r = rospy.Rate(5)
 
     while not rospy.is_shutdown():
-        if (cl.flag == True):
+        if (cl.object_detected == True or cl.detected == True):
             t0 = time.time()
             # Input 
             # convert form cv:Mat to PIL

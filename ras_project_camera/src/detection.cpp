@@ -15,8 +15,8 @@
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/passthrough.h>
 #include <iostream>
-#include <math.h>
 #include <ctime>
+#include <vector>
 
 
 struct timespec start, finish;
@@ -73,7 +73,7 @@ int main (int argc, char** argv)
   pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
   pcl::SACSegmentation<pcl::PointXYZ> seg;
   pcl::ExtractIndices<pcl::PointXYZ> extract;
-
+  std::vector<int> detection_count (3, 0);
   ros::Rate loop_rate(10);
       while (ros::ok())
       {
@@ -171,7 +171,7 @@ int main (int argc, char** argv)
           coord_from_camera.x = x;
           coord_from_camera.y = y;
           coord_from_camera.z = z;
-          std::cerr << " object coords " << x << " " << y << " " << z << std::endl;  
+          std::cerr << " object coords " << x << " " << y << " " << z << std::endl;
         }
 
         else 
