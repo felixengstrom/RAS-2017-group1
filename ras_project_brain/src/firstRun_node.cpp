@@ -4,12 +4,14 @@
 #include <std_msgs/Float32.h>
 #include <std_msgs/String.h>
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Point.h>
 #include <tf/transform_listener.h>
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <math.h>
-#include <ras_project_brain/SetGoalPoint.h>
+#include <ras_project_brain/PickUpObj.h>
 
 #define INITIAL_STATE 0
 #define OBJ_DETECTION_STATE 1
@@ -41,6 +43,7 @@ public:
     ros::Subscriber objectClass_subscriber;
     ros::Subscriber objectPosition_subscriber;
     ros::Subscriber explorationCompletion_subscriber;
+    ros::Subscriber robot_map_position_subscriber;
     tf::TransformListener listener;
 
     FirstRunNode()
@@ -70,6 +73,7 @@ public:
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &FirstRunNode::objectDetectionCallback, this);
         objectPosition_subscriber = n.subscribe("/map/objectCoord", 1, &FirstRunNode::objectPositionCallback, this);
         explorationCompletion_subscriber = n.subscribe("/Explored/Done", 1, &FirstRunNode::explorationCompletionCallback, this);
+        robot_map_position_subscriber = n.subscribe("/robot/pose", 1, &FirstRunNode::robotMapPositionCallback, this);
     }
 
     ~FirstRunNode()
@@ -95,6 +99,11 @@ public:
     void explorationCompletionCallback(const std_msgs::Bool::ConstPtr &msg)
     {
         exploration_completion = msg->data;
+    }
+
+    void robotMapPositionCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
+    {
+        robotPosition = msg->pose.position;
     }
 
     void pExplorationStateMachine()
@@ -193,11 +202,14 @@ public:
             exploration_start_stop = 0;
             msg_exploration_startStop_bool.data = exploration_start_stop;
             exploration_command_publisher.publish(msg_exploration_startStop_bool);
+            float distance_robObj;
+            ros::ServiceClient client = n.serviceClient<ras_project_brain::PickUpObj>("obj_pickup_sm");
+            std::string exitString("Going home");
             switch(current_state_exit)
             {
                 case START_EXIT_PREPARATION:
-                    std::string exitString("Going home");
                     /* Find the object closer to the goal */
+                    current_state_exit = GO_TO_OBJECT;
                     for (int obj=0;obj<i;obj++)
                     {
                         objectDistanceGoal_new = sqrt(pow(list[obj].location.x,2)+
@@ -217,14 +229,23 @@ public:
                     msg_eSpeak_string.data = exitString;
                     objectDetection_publisher.publish(msg_eSpeak_string);
                 break;
-#if 0
                 case GO_TO_OBJECT:
+                    current_state_exit = GO_TO_OBJECT;
                     /*if the position is reached*/
-                    //service call recieved when reached the object
+                    do
+                    {
+                        distance_robObj = sqrt(pow((robotPosition.x-list[item_num].location.x),2)+
+                            pow((robotPosition.y-list[item_num].location.y),2));
+                        ROS_INFO("Distance to the object to be picked: %0.2f", distance_robObj);
+                    }while(distance_robObj>0.26);
                 break;
                 case PICKUP_OBJECT:
-                    //trigger the object pickup by arm state machine.
-                    //wait till arm is able to pick up the object
+                    current_state_exit = GOTO_GOAL;
+                    srv.request.objPickUpState = 1;
+                    if (client.call(srv))
+                    {
+                        ROS_INFO("Object Pickup call success");
+                    }
                 break;
                 case GOTO_GOAL:
                     msg_robotDestination.header.frame_id = "map";
@@ -239,17 +260,9 @@ public:
                     /*drop the object*/
                     /*disengage suction*/
                 break;
-#endif
             }
         }
     }
-/*
-    void pDestinationPublisher(geometry_msgs::PointStamped* destination)
-    {
-        msg_robotDestination.header = destination->header;
-        msg_robotDestination.point = destination->point;
-        robot_destination_publisher.publish(msg_robotDestination);
-    }*/
 
 private:
     std::string classString;
@@ -261,28 +274,14 @@ private:
     float objectDistanceGoal_new,objectDistanceGoal_old;
     std_msgs::String msg_eSpeak_string;
     geometry_msgs::PointStamped msg_robotDestination;
+    geometry_msgs::Point robotPosition;
     std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool,msg_cameraPcl_startStop_bool, msg_motorSlowDown_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
     ros::Time begin;
     object_details list[10];
     int i,j;
+    ras_project_brain::PickUpObj srv;
 };
-
-/*bool setGoal(ras_project_brain::SetGoalPoint::Request  &req, ras_project_brain::SetGoalPoint::Response &res)
-{
-    FirstRunNode* first_run_obj = new FirstRunNode;
-    geometry_msgs::PointStamped final_goal;
-    final_goal.point.x = req.goalPoint.point.x;
-    final_goal.point.y = req.goalPoint.point.y;
-    final_goal.point.z = 0;
-    final_goal.header.frame_id = req.goalPoint.header.frame_id;
-    final_goal.header.stamp = req.goalPoint.header.stamp;
-    //publish the goal value on the topic /robot/goal
-    first_run_obj->pDestinationPublisher(&final_goal);
-    res.error = 0;
-    delete first_run_obj;
-    return true;
-}*/
 
 int main(int argc, char **argv)
 {
@@ -290,7 +289,6 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "firstRun_node");
 
   FirstRunNode first_run_node;
- // ros::ServiceServer service = first_run_node.n.advertiseService("set_robot_goal", setGoal);
 
   /* Runs at a frequency of 10Hz */
   ros::Rate loop_rate(10);
