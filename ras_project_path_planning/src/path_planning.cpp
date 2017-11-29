@@ -69,10 +69,13 @@ class PathPlanning
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1), Wall_step(0), Wall_cost(0),Wall_tolerance(0)
+		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 			n = ros::NodeHandle();
+			n.param<int>("Wall_step",Wall_step,0);
+			n.param<double>("Wall_cost",Wall_cost,0);
+			n.param<int>("Wall_tolerance",Wall_tolerance,0);
 			t_update=ros::Time::now();
 			goal_update=ros::Time::now();
 			curr_sub = n.subscribe("/robot/pose",10,&PathPlanning::CurrCallback,this);
@@ -447,7 +450,8 @@ while(openSet.size()!=0)
 	}
 	amount=amount+1;		
 	//ROS_INFO_STREAM("A* iteration: " << amount << " size of openSet: " << openSet.size()<< "  D = " << D );
-
+if(closeSet.size() >= Csp.size())
+{ ROS_INFO_STREAM("Given goal unreachable by pathplanning"); return;}	
 }
 
 
