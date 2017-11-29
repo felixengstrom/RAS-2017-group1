@@ -49,7 +49,7 @@ def main(args):
     cl = classification()
     rospy.init_node('classification')
 
-    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/VGG16_fully_trained_v2.h5'
+    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/VGG16_v4.h5'
     model = load_model(model_dir)
     print('model loaded')
     size = (224, 224)
@@ -63,11 +63,11 @@ def main(args):
             pil_im = fromarray(cl.cv_image)
             pil_im = pil_im.resize(size) #, resample=0)
             x = image.img_to_array(pil_im)
-            #x = preprocess_input(x)
+            x = preprocess_input(x)
             x = np.expand_dims(x, axis=0)
             preds = model.predict(x, steps = 1)
             #classes = ['Green Cude', 'Green Hollow Cylinder']
-            classes = ['Blue Cube', 'Blue Hollow Triangle', 'Green Cude', 'Green Hollow Cube', 'Green Hollow Cylinder', 'No Object', 'Orange Hollow Cross', 'Orange Star', 'Purple Hollow Cross', 'Purple Star', 'Red Hollow Cube', 'Red Hollow Cylinder', 'Red Sphere', 'Yellow Cube', 'Yellow Sphere']
+            classes = ['Battery', 'Blue Cube', 'Blue Hollow Triangle', 'Green Cude', 'Green Hollow Cube', 'Green Hollow Cylinder', 'No Object', 'Orange Hollow Cross', 'Orange Star', 'Purple Hollow Cross', 'Purple Star', 'Red Hollow Cube', 'Red Hollow Cylinder', 'Red Sphere', 'Yellow Cube', 'Yellow Sphere']
             #print (preds)
             pred = preds[0]
             print (pred)

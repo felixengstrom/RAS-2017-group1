@@ -74,6 +74,7 @@ class PathPlanning
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 			n = ros::NodeHandle();
 			n.param<int>("Wall_step",Wall_step,0);
+            ROS_INFO("wall step %d", Wall_step);
 			n.param<double>("Wall_cost",Wall_cost,0);
 			n.param<int>("Wall_tolerance",Wall_tolerance,0);
 			t_update=ros::Time::now();
