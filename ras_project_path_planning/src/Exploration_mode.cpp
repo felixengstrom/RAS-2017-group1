@@ -71,7 +71,7 @@ class Exploration
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
 		void SwitchCallback(const std_msgs::Bool::ConstPtr& msg)
-		{ GO = msg->data; GO_once = true; if(msg->data == false) GO_once = false; return; }
+		{  GO_once = msg->data;  return; }
 		//Exploration Stratergy Function
 		double calc_explored();
 		void direction_search();
@@ -81,7 +81,7 @@ class Exploration
 		void Add_WallExplored();
 	public:
 
-		Exploration() : Exp_initialized(false),GO_once(false),GO(false),Csp_received(false)
+		Exploration() : Exp_initialized(false),GO_once(false),GO(true),Csp_received(false)
 		{
 
 			//Initialize
@@ -462,13 +462,13 @@ if(Exp_initialized==true)
 	{
 		Done.data = false;
 	}
-	if(GO && Csp_received && Done.data == false)
+	if(GO && GO_once && Csp_received && Done.data == false) //Initial random search, when initialized, GO=false makes sure its only run once
 	{
 		random_search();
 		GO=false;
 	}
 
-	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.2 && Csp_received)
+	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.2 && Csp_received) //New random goal generated when sufficiently close to the previous one
 	{ random_search(); }
 	if(GO_once && Done.data == false)
 	{
