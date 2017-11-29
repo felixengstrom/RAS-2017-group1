@@ -72,7 +72,7 @@ class PathPlanning
 		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
-			n = ros::NodeHandle();
+			n = ros::NodeHandle("~");
 			n.param<int>("Wall_step",Wall_step,0);
 			n.param<double>("Wall_cost",Wall_cost,0);
 			n.param<int>("Wall_tolerance",Wall_tolerance,0);
@@ -105,25 +105,44 @@ double PathPlanning::checkwall(const int index_now)
 	int dx,dy;
 	double tot;
 	maxval=0;
-	for(int i=-1*Wall_step; i<=Wall_step;i++)
+	int step = 1;
+	while( step <= Wall_step)
 	{
-		for(int j=-1*Wall_step; j <= Wall_step; j++)
+	
+		for(int i=-1*step; i<=step;i+=2*step)
 		{
-		checkval= index_now + i + j*_width;
-		if(checkval > upper_limit || checkval < 0){continue;}
-		if(Csp[checkval]!=0)
+			for(int j=-1*step; j <= step; j++)
 			{
-				dx=Wall_step-abs(i)+1;
-				dy=Wall_step-abs(j)+1;
-				tot=sqrt(pow((double)dx,2)+pow((double)dy,2));
-				if(tot>maxval) maxval=tot;
+			checkval= index_now + i + j*_width;
+			if(checkval < upper_limit && checkval >= 0)
+			{
+				if(Csp[checkval]!=0)
+				{
+					dx=Wall_step-abs(i)+1;
+					dy=Wall_step-abs(j)+1;
+					maxval=sqrt(pow((double)dx,2)+pow((double)dy,2));
+					return maxval*Wall_cost;
+	
+				}
+			}
+			checkval = index_now + j + i*_width;
+			if(checkval < upper_limit && checkval >=0)
+			{
+				if(Csp[checkval]!=0)
+				{
+					dx = Wall_step - abs(j)+1;
+					dy = Wall_step - abs(i)+1;
+					maxval=sqrt(pow((double)dx,2)+pow((double)dy,2));
+					return maxval*Wall_cost;
+				}
+			}
 
 			}
 
 		}
-
+		return maxval*Wall_cost;
+	step++;
 	}
-	return maxval*Wall_cost;
 }
 double PathPlanning::heuristic(const point& p1, const point& p2)
 {
