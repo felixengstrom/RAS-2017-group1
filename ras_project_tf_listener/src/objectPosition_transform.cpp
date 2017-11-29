@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "object_position_transform");
     ros::NodeHandle n;
     tf::TransformListener listener(ros::Duration(10));
-    ros::Subscriber sub_position = n.subscribe("camera/world_coord", 1, objectPosition_Callback);
+    ros::Subscriber sub_position = n.subscribe("/camera/world_coord", 1, objectPosition_Callback);
     ros::Subscriber sub_detection = n.subscribe("/tf/start_calc", 1, objectDetection_Callback);
     ros::Publisher objectMap_publisher = n.advertise<geometry_msgs::PointStamped>("/map/objectCoord", 1);
 

@@ -5,6 +5,7 @@
 #include <std_msgs/String.h>
 #include <tf/transform_listener.h>
 #include <string>
+#include <ras_project_brain/PickUpObj.h>
 
 #define INITIAL_STATE 0
 #define OBJ_DETECTION_STATE 1
@@ -26,6 +27,7 @@ public:
     ros::Subscriber objectDetection_subscriber;
     ros::Subscriber objectClass_subscriber;
     tf::TransformListener listener;
+    ros::ServiceServer service;
 
     CentralNode()
     {
@@ -36,6 +38,7 @@ public:
         engage_suction = 0;
         stopMotor_toUpdate = 0;
         current_state = INITIAL_STATE;
+        previous_state = OBJ_PICKUP_STATE;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
         motorStop_publisher = n.advertise<std_msgs::Bool>("/pathFollow/start_stop", 1);
         objectPosition_publisher = n.advertise<std_msgs::Float32>("/motorController/moveToObj", 1);
@@ -44,6 +47,7 @@ public:
         tf_PickUp_publisher = n.advertise<std_msgs::Bool>("/tf/pickup_obj", 1);
         objectClass_subscriber = n.subscribe("/camera/object_class", 1, &CentralNode::objectClassCallback, this);
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &CentralNode::objectDetectionCallback, this);
+        service = n.advertiseService("obj_pickup_sm", &CentralNode::pObjDetectionStateMachine, this);
     }
 
     ~CentralNode()
@@ -61,13 +65,15 @@ public:
         classString.assign(msg->data);
     }
 
-    void pObjDetectionStateMachine()
+    bool pObjDetectionStateMachine(ras_project_brain::PickUpObj::Request  &req, ras_project_brain::PickUpObj::Response &res)
     {
         tf::StampedTransform transform;
+        if (req.objPickUpState == 1)
+        {
         switch (current_state)
         {
         case INITIAL_STATE:
-            if (1 == object_detected_current && (object_detected_prev!=object_detected_current))
+            if (INITIAL_STATE == current_state && OBJ_PICKUP_STATE == previous_state)
             {
                 ROS_INFO("In state object detected");
                 current_state = OBJ_DETECTION_STATE;
@@ -85,16 +91,7 @@ public:
                 msg_motorStartStop_bool.data = stopMotor_toUpdate;
                 objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);
                 motorStop_publisher.publish(msg_motorStartStop_bool);
-                object_detected_prev = object_detected_current;
             }
-            else if(0 == object_detected_current && (object_detected_prev!=object_detected_current))
-            {
-                //engage_suction = 0;
-                object_detected_prev = object_detected_current;
-                //msg_uarm_engageSuction_bool.data = engage_suction;
-                //arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
-            }
-            break;
         case OBJ_DETECTION_STATE:
             if(INITIAL_STATE == previous_state)
             {
@@ -102,6 +99,7 @@ public:
                 current_state = MOVING_TO_POSITION_STATE;
                 previous_state = OBJ_DETECTION_STATE;
                 ROS_INFO("%d",start_coordCalc);
+                /*This while loop is safe to run only when the object is in view*/
                 do{
                     try
                     {
@@ -126,7 +124,6 @@ public:
                     objectPosition_publisher.publish(msg_odomDiffDist_float);
                   }while(diff_distance<-0.05 || diff_distance>0.05);
             }
-            break;
         case MOVING_TO_POSITION_STATE:
             if(OBJ_DETECTION_STATE == previous_state)
             {
@@ -142,8 +139,8 @@ public:
                 msg_tfPickUpObj_bool.data = pickup_object;
                 tf_PickUp_publisher.publish(msg_tfPickUpObj_bool);
                 arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
+                /*Give one more try if failed*/
             }
-            break;
         case OBJ_PICKUP_STATE:
             if (MOVING_TO_POSITION_STATE == previous_state)
             {
@@ -159,8 +156,10 @@ public:
                 objectCoordinateCalc_publisher.publish(msg_tfObjCalc_bool);
                 motorStop_publisher.publish(msg_motorStartStop_bool);
             }
-            break;
         }
+        res.success = 1;
+        }
+        return true;
     }
 
 private:
@@ -180,15 +179,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "central_node");
 
   CentralNode central_node;
+  ros::spin();
 
-  /* Runs at a frequency of 10Hz */
-  ros::Rate loop_rate(10);
-
-  while (central_node.n.ok())
-  {
-    central_node.pObjDetectionStateMachine();
-    ros::spinOnce();
-    loop_rate.sleep();
-  }
   return 0;
 }
