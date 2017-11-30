@@ -8,5 +8,6 @@
 	<node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node" output="screen"/>
 	<include file="$(find ras_project_wall_adder)/launch/wall_adder.launch" />
 	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
+	<node pkg="ras_project_error_detection" type="error_detection_node" name="error_detection" />
 	<node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" output="screen"/>
 </launch>
