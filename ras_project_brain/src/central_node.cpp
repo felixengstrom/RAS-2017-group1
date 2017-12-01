@@ -40,7 +40,7 @@ public:
         current_state = INITIAL_STATE;
         previous_state = OBJ_PICKUP_STATE;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
-        motorStop_publisher = n.advertise<std_msgs::Bool>("/pathFollow/start_stop", 1);
+        motorStop_publisher = n.advertise<std_msgs::Bool>("/robot/stop", 1);
         objectPosition_publisher = n.advertise<std_msgs::Float32>("/motorController/moveToObj", 1);
         arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
         objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);

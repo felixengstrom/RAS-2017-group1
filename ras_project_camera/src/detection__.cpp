@@ -18,6 +18,8 @@
 #include <iostream>
 #include <ctime>
 #include <vector>
+#include <pcl/io/pcd_io.h>
+#include <pcl/common/common.h>
 
 
 struct timespec start, finish;
@@ -38,8 +40,9 @@ public:
   ros::Time lastReading;
   int pixel_x, pixel_y;
   int min_object_size;
+  int min_battery_size;
 
-  detection(): cloud_blob(), min_object_size(40)
+  detection(): cloud_blob(), min_object_size(40), min_battery_size(800)
   {
     sub = nh.subscribe ("/camera/depth/points", 1, &detection::cloud_cb, this);
     pub_detected = nh.advertise<std_msgs::Bool>("/camera/detected",1);
@@ -92,7 +95,7 @@ int main (int argc, char** argv)
         //ROS_INFO("Subscribed for Point Cloud");
         // Perform the VoxelGrid filtering
         vox.setInputCloud (cloudPtr);
-        vox.setLeafSize (0.005, 0.005, 0.005); //.002
+        vox.setLeafSize (0.002, 0.002, 0.002); //.002
         vox.filter (cloud_filtered_vox);
 
         // Convert to the templated PointCloud
@@ -107,8 +110,8 @@ int main (int argc, char** argv)
 
         // Create the statistical outlier removal filtering object
         sor.setInputCloud (cloud_filtered_z);
-        sor.setMeanK (50); //150 for 0.002 50 for 0.005 voxel grid
-        sor.setStddevMulThresh (0.001); //0.001
+        sor.setMeanK (40); //150 for 0.002 50 for 0.005 voxel grid
+        sor.setStddevMulThresh (0.005); //0.001
         sor.filter (*cloud_filtered);
 
         // RANSAC
@@ -120,6 +123,7 @@ int main (int argc, char** argv)
         seg.setDistanceThreshold (0.01);
         for (int k=0; k<1; ++k)
         {
+          std::cerr << "k" << k << std::endl;
           int i = 0, nr_points = (int) cloud_filtered->points.size ();
           // While 30% of the original cloud is still there
           while (cloud_filtered->points.size () > 0.3 * nr_points)
@@ -158,6 +162,23 @@ int main (int argc, char** argv)
         if (object_size > ic.min_object_size ) //&& object_size < min_object_size
         {
           ROS_INFO("Something on the way!");
+          if (object_size > ic.min_battery_size)
+          {
+            for (int l = 0; l<object_size; ++l)
+            {
+              pcl::PointXYZ minPt, maxPt;
+              pcl::getMinMax3D (*cloud_filtered, minPt, maxPt);
+              std::cout << "Max x: " << maxPt.x << std::endl;
+              std::cout << "Max y: " << maxPt.y << std::endl;
+              std::cout << "Max z: " << maxPt.z << std::endl;
+              std::cout << "Min x: " << minPt.x << std::endl;
+              std::cout << "Min y: " << minPt.y << std::endl;
+              std::cout << "Min z: " << minPt.z << std::endl;
+            }
+
+
+          }
+
           detected.data = 1;
 
           float x_points = 0.0;
@@ -183,7 +204,7 @@ int main (int argc, char** argv)
           coord_from_camera.point.x = z_point;
           coord_from_camera.point.y = x_point;
           coord_from_camera.point.z = y_point;
-          //std::cerr << " object coords " << x << " " << y << " " << z << std::endl;
+          std::cerr << " object coords " << x << " " << y << " " << z << std::endl;
         }
 
         else 

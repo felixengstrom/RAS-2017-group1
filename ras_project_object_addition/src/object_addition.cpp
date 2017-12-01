@@ -6,82 +6,159 @@
 #include <tf/transform_datatypes.h>
 #include <math.h>
 #include <std_msgs/Bool.h>
-class PathFollowing
+class ObjectAddition
 {
 	private:
 		ros::NodeHandle n;
-		ros::Publisher motor_pub;
-		ros::Subscriber teleop_sub;
-		ros::Subscriber odometry_sub;
-		ros::Subscriber stop_sub;
-		ros::Subscriber slowdown_sub;
-		geometry_msgs::PoseArray poses;
-		int closest_line;
-		int nb_poses;
-		ros::Time teleopTime;
-		float (*vectors)[2];
-		float D;
-		float normal_speed;
-		float speed;
-	bool stop;
-	bool first;
+		//ros::Publisher motor_pub;
+		ros::Subscriber position_sub;
+		ros::Subscriber classification_sub;
+		geometry_msgs::PointStamped object_point;
+		int object_classification;
+		std::list<std::array<float,3>> classified_objects;
+		char* filename;
 
 	public:
-	PathFollowing()
+	ObjectAddition()
 	{
-		D = 0.3;
-		normal_speed = 0.2;
-		speed = 0.2;
-		stop = true;
-		first = false;
 		n = ros::NodeHandle();
-		teleopTime = ros::Time::now();
-    		teleop_sub = n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
-    		odometry_sub = n.subscribe("/robot/pose", 10, &PathFollowing::odometryCallback,this);
-		stop_sub = n.subscribe("/robot/stop", 10, &PathFollowing::stopCallback,this);
-		slowdown_sub = n.subscribe("/pathFollow/slowDown", 10, &PathFollowing::slowdownCallback,this);
-    		motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
+    		position_sub = n.subscribe("/map/objectCoord", 10, &ObjectAddition::positionCallback,this);
+    		classification_sub = n.subscribe("/camera/object_class", 10, &ObjectAddition::classificationCallback,this);
+		object_point = NULL;
+		object_classification = 0;
+		classified_objects = NULL;
+		filename = "classified_objects.txt";
 	}
-		void teleopCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
-		void odometryCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
-		void stopCallback(const std_msgs::Bool::ConstPtr& msg);
-		void slowdownCallback(const std_msgs::Bool::ConstPtr& msg);
+		void positionCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
+		void classificationCallback(const std_msgs::String::ConstPtr& msg);
+		void object_add(void);
+		int classification_string_to_int(char* classification);
+		float classification_to_radius(int classification);
 };
 
-void PathFollowing::slowdownCallback(const std_msgs::Bool::ConstPtr& msg) {
-	if (msg->data == true)
-	    speed = 0.1;
-	else
-	    speed = normal_speed;
+void ObjectAddition::positionCallback(const geometry_msgs::PointStamped::ConstPtr& msg) {
+	object_point = *msg;
+	if (object_classification != 0)
+	    this.object_add();
+	return;
 }
 
-void PathFollowing::teleopCallback (const geometry_msgs::PoseArray::ConstPtr& msg) {
-	ros::Time cur = msg->header.stamp;
-	if(cur != teleopTime)
+void ObjectAddition::classificationCallback (const std_msgs::String::ConstPtr& msg) {
+	object_classification = classification_string_to_int(msg->data);
+	if (object_point != NULL)
+	    this.object_add();
+	return;
+}
+
+int classification_string_to_int(char* classification)
+{
+	if (classification == "An object")
+		return 1;
+	else if (classification == "Red Cube")
+		return 2;
+	else if (classification == "Red Hollow Cube")
+		return 3;
+	else if (classification == "Blue Cube")
+		return 4;
+	else if (classification == "Green Cube")
+		return 5;
+	else if (classification == "Yellow Cube")
+		return 6;
+	else if (classification == "Yellow Ball")
+		return 7;
+	else if (classification == "Red Ball")
+		return 8;
+	else if (classification == "Red Cylinder")
+		return 9;
+	else if (classification == "Green Cylinder")
+		return 10;
+	else if (classification == "Green Hollow Cube")
+		return 11;
+	else if (classification == "Blue Triangle")
+		return 12;
+	else if (classification == "Purple Cross")
+		return 13;
+	else if (classification == "Purple Star")
+		return 14;
+	else if (classification == "Orange Cross")
+		return 15;
+	else if (classification == "Patric")
+		return 16;
+	else if (classification == "Battery")
+		return 17;
+	else if (classification == "Booby Trap")
+		return 18;
+	else
+		return 0;
+}
+
+float classification_to_radius(int classification)
+{
+	switch(classification)
 	{
-	    first = true;
-	    if (stop == false)
-		delete vectors;
-	    else
-	    	stop = false;
-	    teleopTime = cur;
-  	    poses = *msg;
-  	    closest_line = 0;
-  	    nb_poses = poses.poses.size();
-	    vectors = new float[nb_poses-1][2];
-	    for (int i = 0; i < nb_poses-1; i++)
-	    {
-	     	float length = std::sqrt(std::pow(poses.poses[i+1].position.x - poses.poses[i].position.x,2) + std::pow(poses.poses[i+1].position.y - poses.poses[i].position.y,2));
-	    	float x = poses.poses[i+1].position.x - poses.poses[i].position.x;
-	     	float y = poses.poses[i+1].position.y - poses.poses[i].position.y;
-	     	vectors[i][0] = x/length;
-	     	vectors[i][1] = y/length;
-	    }
+		case 2:
+		case 4:
+		case 5:
+		case 6:
+			return 0.055/2.0;
+		case 3:
+		case 11:
+			return 0.052/2.0;
+		case 7:
+		case 8:
+			return 0.045/2.0;
+		case 9:
+		case 10:
+			return 0.046/2.0;
+		case 12:
+			return 0.048/2.0;
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+			return 0.05/2.0;
+		default:
+			return 0.0;
 	}
 }
 
-void PathFollowing::stopCallback (const std_msgs::Bool::ConstPtr& msg) {
-	stop = msg->data;
+void object_add(void)
+{
+	float object_radius = classification_to_radius(object_classification);
+	bool new_object = true;
+	for (const std::array<float, 3>& object : classified_objects)
+	{
+		float distance = std::sqrt(std::pow(object[0] - object_position.point.x,2)+std::pow(object[1] - object_position.point.y,2));
+		if (object_radius + classification_to_radius(object[2]) > distance)
+		{
+			new_object = false;
+			break;
+		}
+	}
+	if (new_object)
+	{
+		std::array<float, 3> object;
+		object[0] = object_position.point.x;
+		object[1] = object_position.point.y;
+		object[2] = (float) object_classification;
+		classified_objects.push_back(object);
+		add_to_file(object);
+		add_to_map(object);
+	}
+}
+
+void add_to_file(std::array<float, 3> object)
+{
+
+}
+
+void add_to_map(std::array<float, 3> object)
+{
+	float deg_to_rad = std::acos(-1)/180.0;
+	for (float i = 0.0; i < 360.0; i += 30.0)
+	{
+		
+	}
 }
 
 void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {

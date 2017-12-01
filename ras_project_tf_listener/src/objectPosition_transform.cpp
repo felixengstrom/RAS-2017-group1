@@ -11,12 +11,14 @@
 static geometry_msgs::PointStamped object_point;
 static bool object_present;
 
-void objectPosition_Callback(const geometry_msgs::Point::ConstPtr& msg)
+void objectPosition_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
   /* Here the x,y,z position of the object wrt the camera frame are taken */
-  object_point.point.x = msg->x;
-  object_point.point.y = -msg->y;
-  object_point.point.z = msg->z;
+  object_point.point.x = msg->point.x;
+  object_point.point.y = -msg->point.y;
+  object_point.point.z = msg->point.z;
+  object_point.header.frame_id = msg->header.frame_id;
+  object_point.header.stamp = msg->header.stamp;
 }
 void objectDetection_Callback(const std_msgs::Bool::ConstPtr& msg)
 {
@@ -32,10 +34,10 @@ void transformPoint(const tf::TransformListener& listener, ros::Publisher object
     geometry_msgs::PointStamped mapObjPos_msg;
 
     //we'll create a point in the camera frame that we'd like to transform to the robot frame
-    object_point.header.frame_id = "camera";
+/*    object_point.header.frame_id = "camera";
  
     //we'll just use the most recent transform available for our simple example
-    object_point.header.stamp = ros::Time(0);
+    object_point.header.stamp = ros::Time(0);*/
 
     if(TRUE == object_present)
     {
@@ -83,7 +85,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "object_position_transform");
     ros::NodeHandle n;
     tf::TransformListener listener(ros::Duration(10));
-    ros::Subscriber sub_position = n.subscribe("/camera/world_coord", 1, objectPosition_Callback);
+    ros::Subscriber sub_position = n.subscribe("/camera/detection_coord", 1, objectPosition_Callback);
     ros::Subscriber sub_detection = n.subscribe("/tf/start_calc", 1, objectDetection_Callback);
     ros::Publisher objectMap_publisher = n.advertise<geometry_msgs::PointStamped>("/map/objectCoord", 1);
 

@@ -43,7 +43,7 @@ class WallAdder{
         void publishMap();
         WallAdder(std::vector<Line> map_, float POImaxDist_,
                   float POIminError_, int tolerance_, int minPOI_);
-        std::vector<float> rayTrace(float x, float y, float angle, std::vector<int> wall_id);
+        std::vector<float> rayTrace(float x, float y, float angle, std::vector<int>& wall_id);
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
 
 };
@@ -164,10 +164,12 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         double lidar_range = truey.ranges[i];
         double map_range = dists[i];
         if (lidar_range < POImaxDist and map_range-lidar_range > POIminError ) {
-            dists[i] = truey.ranges[i];
+            dists[i] = lidar_range;
             pointsOfInterest[i] = 1;
-        }else if (map_range-lidar_range > POIminError ){
-            pointsOfInterest[i] = -1;
+        }else if (lidar_range < POImaxDist and map_range-lidar_range < -POIminError ){
+            ROS_INFO("so this just happened..!");
+            dists[i] = map_range;
+            pointsOfInterest[i] = 2;
         }else{
             pointsOfInterest[i] = 0;
             dists[i] = std::numeric_limits<double>::infinity();
@@ -190,9 +192,9 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 
         // If the point of interest has the same as the current type or it is
         // the first POI
-        if (pointsOfInterest[i] == type or type==0)
+        if ((pointsOfInterest[i]==type and type!=0) or (type==0 and pointsOfInterest[i]))
         {
-            if (counting)
+            if (type)
             {
                 count++;
                 tol = tolerance;
@@ -207,7 +209,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         }
         else
         {
-            if (counting)
+            if (type)
             {
                 if (tol>0)
                 {
@@ -226,13 +228,14 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                     counting = false;
                     tol = tolerance;
                     type=0;
+                    i = i-tolerance;
                 }
             }
         }
     }
     ROS_INFO("countMax %d, firstMax %d, lastMax %d", countMax, firstMax, lastMax);
     // Calculate wall
-    if (countMax>minPOI)
+    if (countMax>minPOI and typeMax==1)
     {
         Line line;
         float x_disp = lidar_displ_x*cos(angle) - lidar_displ_y*sin(angle);
@@ -245,6 +248,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                  - dists[lastMax]*cos(angle + lastMax * 2*PI/360 + lidar_displ_omega);
         line.y2 = y + y_disp 
                  - dists[lastMax]*sin(angle + lastMax * 2*PI/360 + lidar_displ_omega);
+        line.type = 1;
         map.push_back(line);
 
         ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
@@ -267,12 +271,20 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 
         wall_pub.publish(pa);
 
-        publishPOI(dists);
     }
+    
+    publishPOI(dists);
+    int w_id = wall_id[firstMax];
+    if (typeMax==2 and map[w_id].type == 1)
+    {
+        ROS_INFO("trying to remove wall");
+        map.erase(map.begin()+w_id);
+    }
+
 
 }
 
-std::vector<float> WallAdder::rayTrace(float x, float y, float angle, std::vector<int> wall_id)
+std::vector<float> WallAdder::rayTrace(float x, float y, float angle, std::vector<int>& wall_id)
 {
     int n_angles = 359;
     std::vector<float> dists(n_angles);
@@ -359,6 +371,7 @@ int main(int argc, char*argv[])
         wall.x2 = x2;
         wall.y1 = y1;
         wall.y2 = y2;
+        wall.type=0;
         map.push_back(wall);
         c++;
     }
@@ -366,7 +379,7 @@ int main(int argc, char*argv[])
 
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.7);
+    nh.param<float>("POImaxDist", POImaxDist, 0.4);
     float POIminError;
     nh.param<float>("POIminError", POIminError, 0.1);
     int tolerance;
