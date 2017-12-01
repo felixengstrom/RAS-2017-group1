@@ -63,13 +63,15 @@ class PathPlanning
 		ros::Time pathTime;
 		//Path Smoothing
 		std::vector<int> path_list;
+		double gradient;
+		bool newtry;
 		//A* Heuristic wall avoiding value
 		int Wall_step;
 		double Wall_cost;
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
+		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1),newtry(false) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 			n = ros::NodeHandle("~");
@@ -95,8 +97,43 @@ class PathPlanning
 		void Reconstruct_path(int curr_index); //Reconstruct path from Path() WITH SMOOTHING
 		bool Checkline(int start, int goal); //used in Reconstruct_path, check if line between two points [start,goal] is empty
 		void loop_function();
+		bool Gradientsmoothing(int start, int goal);
 };
 
+bool PathPlanning::Gradientsmoothing(int start, int goal)
+{
+ 	int xs,ys,xg,yg;
+ 	double new_gradient,dx,dy,epsilon;
+	xs = start % _width ;
+	ys = start / _width ;
+	xg = goal % _width ;
+	yg = goal / _width ;
+	dx = (double)(xg-xs);
+	dy = (double)(yg-ys);
+	new_gradient =atan2(dy,dx);
+	epsilon = 0.01; //aproximately 34 degree of error
+	if(newtry == false) //when new gradient is to be tried
+ 	{
+		gradient = new_gradient;
+		newtry = true;
+		return true;
+	}
+	else
+	{
+		//if(abs(new_gradient-gradient) < epsilon)
+		if(new_gradient==gradient)
+		{
+			return true;
+		}
+		else
+		{
+		//	newtry = false;
+		 	gradient = new_gradient;
+			return false;
+		}
+	}
+
+}
 double PathPlanning::checkwall(const int index_now)
 {
 	int upper_limit = _width*_height;
@@ -501,17 +538,31 @@ while(parent!=child)
 	child = parent;
 	parent = cameFrom[child];
 //	reverse_path.push_back(parent);
-	//if(checkwall(child)<wallT){continue;}
 	//else if(Checkline(smooth,parent)){continue;}
-	if(Checkline(smooth,parent)){continue;}
-		
-	reverse_smooth.push_back(child);
+	//if(Checkline(smooth,parent)){continue;}
+	if(Gradientsmoothing(child,parent)){continue;}	
+	//reverse_smooth.push_back(child);
+	reverse_smooth.push_back(parent);
 	smooth=child;
 
 }
-reverse_smooth.push_back(parent);
+//reverse_smooth.push_back(parent);
 std::reverse(reverse_smooth.begin(),reverse_smooth.end());
-path_list=reverse_smooth;
+std::vector<int> doublesmooth;
+doublesmooth.push_back(reverse_smooth[0]);
+smooth = reverse_smooth[0];
+for(int i = 1; i<reverse_smooth.size();i++)
+{
+	child = reverse_smooth[i-1];
+	parent = reverse_smooth[i];
+	if(Checkline(smooth,parent)){continue;}
+	doublesmooth.push_back(child);
+	smooth=child;
+}
+doublesmooth.push_back(parent);
+path_list=doublesmooth;
+//path_list=reverse_smooth;
+newtry=false;
 return;
 }
 
