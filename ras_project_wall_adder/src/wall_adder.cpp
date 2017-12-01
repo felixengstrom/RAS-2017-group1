@@ -50,12 +50,14 @@ class WallAdder{
         ros::Subscriber sub;
         ros::Publisher pub;
         ros::Publisher wall_pub;
+        ros::Publisher wall_r_pub;
         ros::Publisher vis_pub;
         tf::TransformListener listener;
 
         // Private methods
         void publishPOI(std::vector<float> dists);
         void addWall(Line line);
+        void removeWall(Line line);
 
     public:
         void loadMap();
@@ -99,7 +101,7 @@ WallAdder::WallAdder(std::string map_file_,
     pub = n.advertise<sensor_msgs::LaserScan>("wall_dists", 10);
 
     wall_pub = n.advertise<geometry_msgs::PoseArray>("wall_add", 10);
-    //wall_r_pub = n.advertise<geometry_msgs::PoseArray>("wall_remove", 10);
+    wall_r_pub = n.advertise<geometry_msgs::PoseArray>("wall_remove", 10);
     vis_pub = n.advertise<visualization_msgs::MarkerArray>( "updatedMap", 10 );
 }
 bool WallAdder::hasSubscriber(){
@@ -302,7 +304,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
     {
         ROS_INFO("trying to remove wall");
-        //removeWall(line);
+        removeWall(map[w_id]);
         map.erase(map.begin()+w_id);
     }
 }
@@ -327,26 +329,26 @@ void WallAdder::addWall(Line line){
         ROS_INFO("added? wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
 }
 
-//void WallAdder::removeWall(Line line){
-//
-//        ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
-//        geometry_msgs::PoseArray pa;
-//        geometry_msgs::Pose p1;
-//        geometry_msgs::Pose p2;
-//        p1.position.x = line.x1;
-//        p1.position.y = line.y1;
-//        p2.position.x = line.x2;
-//        p2.position.y = line.y2;
-//        std::vector<geometry_msgs::Pose> poses(2);
-//        poses[0] = p1;
-//        poses[1] = p2;
-//        std_msgs::Header h;
-//        h.frame_id = "map";
-//        h.stamp = ros::Time::now();
-//        pa.header = h;
-//        pa.poses = poses;
-//        wall_pub.publish(pa);
-//}
+void WallAdder::removeWall(Line line){
+
+        ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
+        geometry_msgs::PoseArray pa;
+        geometry_msgs::Pose p1;
+        geometry_msgs::Pose p2;
+        p1.position.x = line.x1;
+        p1.position.y = line.y1;
+        p2.position.x = line.x2;
+        p2.position.y = line.y2;
+        std::vector<geometry_msgs::Pose> poses(2);
+        poses[0] = p1;
+        poses[1] = p2;
+        std_msgs::Header h;
+        h.frame_id = "map";
+        h.stamp = ros::Time::now();
+        pa.header = h;
+        pa.poses = poses;
+        wall_r_pub.publish(pa);
+}
 
 
 std::vector<float> WallAdder::rayTrace(float x, float y, float angle, std::vector<int>& wall_id)
