@@ -14,69 +14,100 @@
 #include <random>
 
 static const float PI = acos(-1);
+// Help struct for storing walls
 struct Line{
     float x1;
     float x2;
     float y1;
     float y2;
+    // Wall type: Original wall = 0, added wall = 1
     int type;
 };
+
 class WallAdder{
     private:
+        // Lidar displacement relative to robot
         float lidar_displ_x;
         float lidar_displ_y;
         float lidar_displ_omega;
+
+        // Tunable parameters for the wall adding
         float POImaxDist;
         float POIminError;
         int tolerance;
         int minPOI;
+        int minPOIremove;
+
+        // Map file paths
+        std::string map_file;
+        std::string new_map_file;
+
+        // Map
         std::vector<Line> map;
+
+        // Ros parameters
+        ros::NodeHandle n;
         ros::Subscriber sub;
         ros::Publisher pub;
         ros::Publisher wall_pub;
         ros::Publisher vis_pub;
-        ros::NodeHandle n;
         tf::TransformListener listener;
+
+        // Private methods
         void publishPOI(std::vector<float> dists);
+        void addWall(Line line);
 
     public:
-        void publishMap();
-        WallAdder(std::vector<Line> map_, float POImaxDist_,
-                  float POIminError_, int tolerance_, int minPOI_);
+        void loadMap();
+        // Constructor
+        WallAdder( std::string map_file_, std::string new_map_file_, float POImaxDist_,
+                  float POIminError_, int tolerance_, int minPOI_, int minPOIremove_);
+        // Public methods
         std::vector<float> rayTrace(float x, float y, float angle, std::vector<int>& wall_id);
+        bool hasSubscriber();
+        void publishMap();
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
+        void saveMap(std::string new_map_file);
 
 };
 
-WallAdder::WallAdder(std::vector<Line> map_,
+WallAdder::WallAdder(std::string map_file_,
+          std::string new_map_file_,
           float POImaxDist_,
           float POIminError_,
           int tolerance_,
-          int minPOI_):POImaxDist(POImaxDist_), POIminError(POIminError_),
-                       tolerance(tolerance_),minPOI(minPOI_), map(map_), n(),
-                       listener()
+          int minPOI_, int minPOIremove_):POImaxDist(POImaxDist_), POIminError(POIminError_),
+                       tolerance(tolerance_),minPOI(minPOI_), n(),
+                       minPOIremove(minPOIremove_), listener(),
+                       map_file(map_file_), new_map_file(new_map_file_)
 {
+    // Get the lidars position relative to robot
     tf::StampedTransform transform;
     try{
-        listener.waitForTransform("robot","laser",
-                                  ros::Time(0), ros::Duration(2));
-        listener.lookupTransform("robot","laser",
-                                 ros::Time(0), transform);
+        listener.waitForTransform("robot","laser", ros::Time(0), ros::Duration(2));
+        listener.lookupTransform("robot","laser", ros::Time(0), transform);
     } catch(tf::TransformException &ex)
     {
         ROS_INFO("laser transform not found");
     }
-
     lidar_displ_x = transform.getOrigin().x();
     lidar_displ_y = transform.getOrigin().y();
     lidar_displ_omega = tf::getYaw(transform.getRotation());
+    
+    // Initiate ros parameters
     sub = n.subscribe("/scan", 1, &WallAdder::scanCallback, this);
     pub = n.advertise<sensor_msgs::LaserScan>("wall_dists", 10);
+
     wall_pub = n.advertise<geometry_msgs::PoseArray>("wall_add", 10);
-    vis_pub = n.advertise<visualization_msgs::MarkerArray>( "updatedMap", 0 );
+    //wall_r_pub = n.advertise<geometry_msgs::PoseArray>("wall_remove", 10);
+    vis_pub = n.advertise<visualization_msgs::MarkerArray>( "updatedMap", 10 );
+}
+bool WallAdder::hasSubscriber(){
+    return wall_pub.getNumSubscribers()>0;
 }
 void WallAdder::publishMap()
 {
+    // Create wall marker array with proper values
     visualization_msgs::MarkerArray all_markers;
     visualization_msgs::Marker wall_marker;
     wall_marker.header.frame_id = "map";
@@ -91,6 +122,8 @@ void WallAdder::publishMap()
     wall_marker.color.g = (0.0/255.0);
     wall_marker.color.b = (0.0/255.0);
     wall_marker.pose.position.z = 0.2;
+
+    // Calculate and and the walls to markerArray
     int wall_id = 0;
     for (int i = 0; i<map.size(); i++)
     {
@@ -116,6 +149,8 @@ void WallAdder::publishMap()
         wall_id++;
 
     }
+
+    // Publish array
     vis_pub.publish(all_markers);
 }
 void WallAdder::publishPOI(std::vector<float> dists)
@@ -163,10 +198,17 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     for (int i  = 0; i< truey.ranges.size(); i++){
         double lidar_range = truey.ranges[i];
         double map_range = dists[i];
-        if (lidar_range < POImaxDist and map_range-lidar_range > POIminError ) {
+        double map_range_r = dists[(i+1)%dists.size()];
+        double map_range_l = dists[(i-1)%dists.size()];
+        double dist_r = map_range_r - lidar_range;
+        double dist_m = map_range - lidar_range;
+        double dist_l = map_range_l - lidar_range;
+        double to_close = std::min(std::min(dist_r, dist_m), dist_l);
+        double to_far = std::max(std::max(dist_r, dist_m), dist_l);
+        if (lidar_range < POImaxDist and to_close > POIminError ) {
             dists[i] = lidar_range;
             pointsOfInterest[i] = 1;
-        }else if (lidar_range < POImaxDist and map_range-lidar_range < -POIminError ){
+        }else if (lidar_range < POImaxDist and to_far < -POIminError ){
             ROS_INFO("so this just happened..!");
             dists[i] = map_range;
             pointsOfInterest[i] = 2;
@@ -175,7 +217,6 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
             dists[i] = std::numeric_limits<double>::infinity();
         }
     }
-    bool counting = false;
     int first = 0; 
     int last = 0;
     int firstMax = 0;
@@ -187,8 +228,10 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     int typeMax = 0;
 
     // Check for walls to add
-    for(int i = 0; i<pointsOfInterest.size(); i++)
+    int j = 0;
+    while( j<dists.size() or type!=0)
     {
+        int i = j%dists.size();
 
         // If the point of interest has the same as the current type or it is
         // the first POI
@@ -202,7 +245,6 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
             else
             {
                 first = i;
-                counting = true;;
                 type = pointsOfInterest[i];
                 count++;
             }
@@ -215,7 +257,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                 {
                     tol--;
                 } else {
-                    last = i-tolerance-1;
+                    last = (i-tolerance-1)%dists.size();
                     if (count>countMax)
                     {
                        countMax = count;
@@ -225,15 +267,15 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                     }
 
                     count = 0;
-                    counting = false;
                     tol = tolerance;
                     type=0;
-                    i = i-tolerance;
+                    j = j-tolerance;
                 }
             }
         }
+        j++;
     }
-    ROS_INFO("countMax %d, firstMax %d, lastMax %d", countMax, firstMax, lastMax);
+    //ROS_INFO("countMax %d, firstMax %d, lastMax %d, typMax %d", countMax, firstMax, lastMax, typeMax);
     // Calculate wall
     if (countMax>minPOI and typeMax==1)
     {
@@ -250,9 +292,23 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
                  - dists[lastMax]*sin(angle + lastMax * 2*PI/360 + lidar_displ_omega);
         line.type = 1;
         map.push_back(line);
+        addWall(line);
 
         ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
+    }
+    
+    publishPOI(dists);
+    int w_id = wall_id[firstMax];
+    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
+    {
+        ROS_INFO("trying to remove wall");
+        //removeWall(line);
+        map.erase(map.begin()+w_id);
+    }
+}
+void WallAdder::addWall(Line line){
 
+        ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
         geometry_msgs::PoseArray pa;
         geometry_msgs::Pose p1;
         geometry_msgs::Pose p2;
@@ -265,28 +321,37 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         poses[1] = p2;
         std_msgs::Header h;
         h.frame_id = "map";
-        h.stamp = ros::Time::now();
         pa.header = h;
         pa.poses = poses;
-
         wall_pub.publish(pa);
-
-    }
-    
-    publishPOI(dists);
-    int w_id = wall_id[firstMax];
-    if (typeMax==2 and map[w_id].type == 1)
-    {
-        ROS_INFO("trying to remove wall");
-        map.erase(map.begin()+w_id);
-    }
-
-
+        ROS_INFO("added? wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
 }
+
+//void WallAdder::removeWall(Line line){
+//
+//        ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
+//        geometry_msgs::PoseArray pa;
+//        geometry_msgs::Pose p1;
+//        geometry_msgs::Pose p2;
+//        p1.position.x = line.x1;
+//        p1.position.y = line.y1;
+//        p2.position.x = line.x2;
+//        p2.position.y = line.y2;
+//        std::vector<geometry_msgs::Pose> poses(2);
+//        poses[0] = p1;
+//        poses[1] = p2;
+//        std_msgs::Header h;
+//        h.frame_id = "map";
+//        h.stamp = ros::Time::now();
+//        pa.header = h;
+//        pa.poses = poses;
+//        wall_pub.publish(pa);
+//}
+
 
 std::vector<float> WallAdder::rayTrace(float x, float y, float angle, std::vector<int>& wall_id)
 {
-    int n_angles = 359;
+    int n_angles = 360;
     std::vector<float> dists(n_angles);
     for(int a = 0; a<n_angles; a++)
     {
@@ -327,24 +392,17 @@ std::vector<float> WallAdder::rayTrace(float x, float y, float angle, std::vecto
     }
     return dists;
 }
-int main(int argc, char*argv[])
+void WallAdder::loadMap()
 {
-    ros::init(argc, argv, "wall_adder");
-    ros::NodeHandle nh("~");
-    std::string _map_file;
     std::string line;
-    nh.param<std::string>("map_file", _map_file, "lab_maze_2017.txt");
 
-    ROS_INFO_STREAM("Loading the maze map from " << _map_file);
+    ROS_INFO_STREAM("Loading the maze map from " << map_file);
 
-    std::ifstream map_fs; map_fs.open(_map_file.c_str());
+    std::ifstream map_fs; map_fs.open(map_file.c_str());
     if (!map_fs.is_open()){
-        ROS_ERROR_STREAM("Could not read maze map from "<<_map_file<<". Please double check that the file exists. Aborting.");
-        return -1;
+        ROS_ERROR_STREAM("Could not read maze map from "<<map_file<<". Please double check that the file exists. Aborting.");
     }
 
-    ros::NodeHandle n;
-    std::vector<Line> map;
     int c = 0;
     while (getline(map_fs, line)){
 
@@ -376,19 +434,90 @@ int main(int argc, char*argv[])
         c++;
     }
     ROS_INFO_STREAM("Read "<<c<<" walls from map file.");
+    map_fs.close();
 
+
+    ROS_INFO_STREAM("Loading the maze map from " << new_map_file);
+
+    map_fs.open(new_map_file.c_str());
+    if (!map_fs.is_open()){
+        ROS_ERROR_STREAM("Could not read maze map from "<<new_map_file<<". Please double check that the file exists. Aborting.");
+    }
+
+    c = 0;
+    while (getline(map_fs, line)){
+
+        if (line[0] == '#') {
+            // comment -> skip
+            continue;
+        }
+
+        double max_num = std::numeric_limits<double>::max();
+        double x1= max_num,
+               x2= max_num,
+               y1= max_num,
+               y2= max_num;
+
+        std::istringstream line_stream(line);
+
+        line_stream >> x1 >> y1 >> x2 >> y2;
+
+        if ((x1 == max_num) || ( x2 == max_num) || (y1 == max_num) || (y2 == max_num)){
+            ROS_WARN("Segment error. Skipping line: %s",line.c_str());
+        }
+        Line wall;
+        wall.x1 = x1;
+        wall.x2 = x2;
+        wall.y1 = y1;
+        wall.y2 = y2;
+        wall.type=1;
+        map.push_back(wall);
+        addWall(wall);
+        c++;
+    }
+    ROS_INFO_STREAM("Read "<<c<<" walls from map file.");
+}
+void WallAdder::saveMap(std::string new_map_file)
+{
+    std::ofstream out(new_map_file, std::ofstream::trunc);
+    for(int i = 0 ; i < map.size();i++){
+        if (map[i].type == 1)
+        {
+            out << map[i].x1 << " "<< map[i].y1 << " "<< map[i].x2 << " "<< map[i].y2 << std::endl;
+        }
+    }
+}
+  
+int main(int argc, char*argv[])
+{
+
+    ros::init(argc, argv, "wall_adder");
+    ros::NodeHandle nh("~");
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.4);
+    nh.param<float>("POImaxDist", POImaxDist, 0.7);
     float POIminError;
-    nh.param<float>("POIminError", POIminError, 0.1);
+    nh.param<float>("POIminError", POIminError, 0.5);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 2);
+    nh.param<int>("tolerance", tolerance, 1);
     int minPOI;
     nh.param<int>("minPOI", minPOI, 10);
+    int minPOIremove;
+    nh.param<int>("minPOIremove", minPOIremove, 3);
 
-    WallAdder wa(map, POImaxDist, POIminError, tolerance, minPOI);
+    std::string map_file;
+    nh.param<std::string>("map_file", map_file, "lab_maze_2017.txt");
+
+    std::string new_map_file;
+    nh.param<std::string>("new_map_file", new_map_file, "lab_maze_2017_new.txt");
+
+    WallAdder wa(map_file, new_map_file, POImaxDist, POIminError, tolerance, minPOI, minPOIremove);
+
     ros::Rate rate(10);
+    while(ros::ok() and !wa.hasSubscriber()){
+        rate.sleep();
+    }
+    wa.loadMap();
     while(ros::ok())
     {
         wa.publishMap();
@@ -396,4 +525,6 @@ int main(int argc, char*argv[])
         rate.sleep();
 
     }
+    wa.saveMap(new_map_file);
+
 }

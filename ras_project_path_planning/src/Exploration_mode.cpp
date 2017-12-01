@@ -453,7 +453,7 @@ if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
 	double percentage_explored = calc_explored();
-	if((percentage_explored) >0.5)
+	if((percentage_explored) >0.9)
 	{
 		Done.data = true;
 		ROS_INFO_STREAM("We have now explored the amount specified. Done message is now true");
