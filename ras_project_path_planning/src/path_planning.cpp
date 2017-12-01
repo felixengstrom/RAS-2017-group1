@@ -251,7 +251,7 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 	for(i=0;i<OG.size();i++)
 		{
 		//ROS_INFO_STREAM("for i = " << i << " we have OG " << (int)OG[i] );
-		if((int)OG[i]==100)//thicken points/wall
+		if((int)OG[i]!=0)//thicken points/wall
 			{
 				Csp[i]=100;
 				//ROS_INFO_STREAM("for i = " << i << " we have Csp " << (int)Csp[i]<< " cell " << cells );
