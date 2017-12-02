@@ -23,6 +23,7 @@ struct point {
 	int y;
 	double g;
 	double f;
+	double gex;
 	};
 bool cmp(const std::pair<int,point>& s1, const std::pair<int,point>& s2)
 { return s1.second.f  < s2.second.f ; }
@@ -78,12 +79,13 @@ class PathPlanning
 			n.param<int>("Wall_step",Wall_step,0);
 			n.param<double>("Wall_cost",Wall_cost,0);
 			n.param<int>("Wall_tolerance",Wall_tolerance,0);
+			ROS_INFO_STREAM("Wall_step: " << Wall_step << " Wall_cost: " << Wall_cost);
 			t_update=ros::Time::now();
 			goal_update=ros::Time::now();
 			curr_sub = n.subscribe("/robot/pose",10,&PathPlanning::CurrCallback,this);
 			OG_sub = n.subscribe("/maze_OccupancyGrid",10,&PathPlanning::OGCallback,this);
 			goal_sub= n.subscribe("/robot/goal",10,&PathPlanning::GoalCallback,this);
-			C_pub  = n.advertise<nav_msgs::OccupancyGrid>("//maze_CSpace",1000);
+			C_pub  = n.advertise<nav_msgs::OccupancyGrid>("/maze_CSpace",1000);
 			Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 			Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
 		}
@@ -111,7 +113,7 @@ bool PathPlanning::Gradientsmoothing(int start, int goal)
 	dx = (double)(xg-xs);
 	dy = (double)(yg-ys);
 	new_gradient =atan2(dy,dx);
-	epsilon = 0.01; //aproximately 34 degree of error
+
 	if(newtry == false) //when new gradient is to be tried
  	{
 		gradient = new_gradient;
@@ -158,6 +160,7 @@ double PathPlanning::checkwall(const int index_now)
 					dx=Wall_step-abs(i)+1;
 					dy=Wall_step-abs(j)+1;
 					maxval=sqrt(pow((double)dx,2)+pow((double)dy,2));
+		//			ROS_INFO_STREAM("at x : " << index_now%_width << " y : " << index_now/_width<< "IM RETURNING : " << maxval*Wall_cost);
 					return maxval*Wall_cost;
 	
 				}
@@ -170,6 +173,8 @@ double PathPlanning::checkwall(const int index_now)
 					dx = Wall_step - abs(j)+1;
 					dy = Wall_step - abs(i)+1;
 					maxval=sqrt(pow((double)dx,2)+pow((double)dy,2));
+		//			ROS_INFO_STREAM("at x : " << index_now%_width << " y : " << index_now/_width<<"IM RETURNING : " << maxval*Wall_cost);
+					
 					return maxval*Wall_cost;
 				}
 			}
@@ -177,17 +182,17 @@ double PathPlanning::checkwall(const int index_now)
 			}
 
 		}
-		return maxval*Wall_cost;
 	step++;
 	}
+	return 0;
 }
 double PathPlanning::heuristic(const point& p1, const point& p2)
 {
 	int index_now=p1.x+p1.y*_width;
-	double cost;
-	cost = checkwall(index_now);
+	double cost = 0;
+	//cost = checkwall(index_now);
 	
-	return (double)(cost+sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2))); }
+	return (double)(cost+sqrt(pow((double)(p2.x-p1.x),2)+pow((double)(p2.y-p1.y),2))); }
 void PathPlanning::loop_function()
 {
 if(initialized == false) return; // suspend loop until the OccupancyGrid is loaded
@@ -450,6 +455,7 @@ std::map <int,point> openSet;
 point goalpos;
 goalpos.x = x_cell;
 goalpos.y = y_cell;
+double goalwall_val = checkwall(x_cell+y_cell*_width);
 //start pos
 point startpos; 
 startpos.x=x_Start; 
@@ -460,10 +466,10 @@ int tmp1=startpos.x+_width*startpos.y;
 openSet.insert(std::pair<int,point>(tmp1,startpos));
 cameFrom.insert(std::pair<int,int>(tmp1,tmp1));
 std::map<int,point> closeSet;
-int amount;
-amount=0;
+int closed_size=closeSet.size(); //Check if closeSet is increasing or standing still
+int no_path = true; 
 //Herustic h(s0,s1) = abs(s1-s0)
-while(openSet.size()!=0)
+while(openSet.size()!=0 && no_path)
 {
 	
 	//Check for lowest f value	
@@ -475,6 +481,7 @@ while(openSet.size()!=0)
 	int curr_index = current.x+current.y*_width;
 	if(current.x==goalpos.x && current.y==goalpos.y)
 	{Reconstruct_path(curr_index);return;}
+	
 	closeSet.insert(std::pair<int,point>(curr_index,current));
 	openSet.erase(D);
 	//ROS_INFO_STREAM("comparison: openset size: " << openSet.size() << " also curr_index: " << curr_index << " D : " << D);
@@ -486,30 +493,33 @@ while(openSet.size()!=0)
 			int iter_index = curr_index+j+i*_width;
 		//	ROS_INFO_STREAM("iter_index = " << iter_index << "CSP OF IT = " << (int)Csp[iter_index]);
 			if(iter_index < 0 || iter_index > _width*_height) {continue;} //out of bound
+			//if(Csp[iter_index]!=0|| checkwall(iter_index)>goalwall_val){continue;}//check for wall / obstacle
 			if(Csp[iter_index]!=0){continue;}//check for wall / obstacle
 			
 			if(closeSet.find(iter_index)!=closeSet.end()){continue;}//check if already exist in closedset
 			point neighbour;
 			neighbour.x=current.x+j; neighbour.y=current.y+i;
-			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2)) +checkwall(iter_index); //HERE CHECKWALL
-			neighbour.f=neighbour.g+heuristic(neighbour,goalpos);
+			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2));
+			neighbour.gex = neighbour.g+checkwall(iter_index);
+			neighbour.f=neighbour.g+checkwall(iter_index)+heuristic(neighbour,goalpos);
 			
 			if(openSet.find(iter_index)==openSet.end()){openSet.insert(std::pair<int,point>(iter_index,neighbour));}//check if already in openset
 			if(cameFrom.find(iter_index)==cameFrom.end()){cameFrom.insert(std::pair<int,int>(iter_index,curr_index));} //add current index to map, with its parent index as value
-			if(neighbour.g >=openSet[iter_index].g){continue;} //if the already in openset have lower g (or same, for previous insertion) this path not optimal, skip
+			if(neighbour.gex >=openSet[iter_index].gex){continue;} //if the already in openset have lower g (or same, for previous insertion) this path not optimal, skip
+			//if(neighbour.g >=openSet[iter_index].g){continue;} //if the already in openset have lower g (or same, for previous insertion) this path not optimal, skip
 			openSet[iter_index].g=neighbour.g;
 			openSet[iter_index].f=neighbour.f;
+			openSet[iter_index].gex=neighbour.gex;
 			cameFrom[iter_index]=curr_index;//update parent to the best parent! (children can choose parents, halleljuah
 			
 
 		}
-	}
-	amount=amount+1;		
+	}		
 	//ROS_INFO_STREAM("A* iteration: " << amount << " size of openSet: " << openSet.size()<< "  D = " << D );
-if(closeSet.size() >= Csp.size())
-{ ROS_INFO_STREAM("Given goal unreachable by pathplanning"); return;}	
+if(closeSet.size() <=closed_size)
+{ ROS_INFO_STREAM("Given goal unreachable by pathplanning"); Wall_step = std::max(0,Wall_step-1); return;}	
+closed_size=closeSet.size();
 }
-
 
 return;
 }

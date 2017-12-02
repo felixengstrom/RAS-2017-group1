@@ -6,10 +6,12 @@
 		<param name="map_file" value="$(find ras_project_localisation)/map/$(arg map_file)" />
 	</node>
 	 <node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node" output="screen">
-                  <param name="Wall_step" value="3"/>
-                  <param name="Wall_cost" value="10"/>
+                  <param name="Wall_step" value="2"/>
+                  <param name="Wall_cost" value="100"/>
           </node>
 	<include file="$(find ras_project_wall_adder)/launch/wall_adder.launch" />
 	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
-	<node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" output="screen"/>
+	<node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" output="screen">
+		<param name="exploration_percentage" value = "0.9" />
+	</node>
 </launch>

@@ -46,7 +46,7 @@ class PathFollowing
 		v_min = 0.1; //0.01
 		v_max = 0.5; // 0.2
 		vGain = 0.5; //  1
-		D = 0.3;
+		D = 0.1;
 		normal_speed = 0.2;
 		speed = 0.2;
 		w_min = 0.1; // previosu was 0.5, testing 0.4
