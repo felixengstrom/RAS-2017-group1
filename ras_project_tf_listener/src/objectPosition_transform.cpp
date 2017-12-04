@@ -41,6 +41,7 @@ void transformPoint(const tf::TransformListener& listener, ros::Publisher object
 
     if(TRUE == object_present)
     {
+        ROS_INFO("Started calculating object position");
         try
         {
             geometry_msgs::PointStamped object_point_base;
@@ -86,7 +87,7 @@ int main(int argc, char** argv)
     ros::NodeHandle n;
     tf::TransformListener listener(ros::Duration(10));
     ros::Subscriber sub_position = n.subscribe("/camera/detection_coord", 1, objectPosition_Callback);
-    ros::Subscriber sub_detection = n.subscribe("/tf/start_calc", 1, objectDetection_Callback);
+    ros::Subscriber sub_detection = n.subscribe("/tf/start_calc", 2, objectDetection_Callback);
     ros::Publisher objectMap_publisher = n.advertise<geometry_msgs::PointStamped>("/map/objectCoord", 1);
 
    //we'll transform a point once every second

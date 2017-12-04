@@ -4,7 +4,7 @@ import std_msgs.msg
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
-from ras_project_camera.msg import stringStamped
+from ras_project_camera.msg import StringStamped
 from keras.applications.mobilenet import preprocess_input, relu6, DepthwiseConv2D
 from keras.preprocessing import image
 from keras.models import load_model
@@ -42,7 +42,7 @@ def main(args):
     cl = classification()
     rospy.init_node('classification')
 
-    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/mobilenet_v3.h5'
+    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/mobilenet.h5'
     #model = load_model(model_dir)
     with CustomObjectScope({
     	'relu6': relu6,
@@ -62,9 +62,7 @@ def main(args):
 			pil_im = pil_im.resize(size) #, resample=0)
 			x = image.img_to_array(pil_im)
 			x = preprocess_input(x)
-			#x = preprocess_input(cl.cv_image)
-			#x = cv.normalize(x, alpha=0, beta=1, norm_type=cv.NORM_MINMAX)#, dtype=cv.CV_32F)
-			#print (x)
+			x = cv.normalize(x, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=BGR8)
 			x = np.expand_dims(x, axis=0)
 			preds = model.predict(x, steps = 1)
 			classes = ['Blue Cube', 'Blue Triangle', 'Green Cube', 'Green Hollow Cube', 'Green Cyllinder', 'No Object', 'Orange Cross', 'Patric', 'Purple Cross', 'Purple Star', 'Red Hollow Cube', 'Red Cyllinder', 'Red Ball', 'Yellow Cube', 'Yellow Ball']
@@ -77,15 +75,17 @@ def main(args):
 			index, value = max(enumerate(pred), key=operator.itemgetter(1))
 			clas = classes[index]
 			#rospy.loginfo("index %i", index)
-			rospy.loginfo("value %d, object class %s: ", value*100, clas)
-			# publish if prob higher 70%
-			if (value>0.7):
-				h = std_msgs.msg.Header()
-				h.stamp = cl.lastReading
-				cl.pub_object_class.publish (header = h, data = clas)
-				#cl.pub_object_class.publish (data = clas)
-				#cv2.imshow("Image window", cv_image)
-				#cv2.waitKey(3)
+			rospy.loginfo("value %d", value*100)
+			result = (clas, value)
+			#rospy.loginfo('Predicted object is %s', result[0])
+
+			rospy.loginfo('object class %s', clas)
+			h = std_msgs.msg.Header()
+			h.stamp = cl.lastReading
+			cl.pub_object_class.publish (header = h, data = clas)
+			#cl.pub_object_class.publish (data = clas)
+			#cv2.imshow("Image window", cv_image)
+			#cv2.waitKey(3)'''
 			r.sleep()
 
 if __name__ == '__main__':
