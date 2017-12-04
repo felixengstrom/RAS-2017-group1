@@ -9,6 +9,7 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
+#include <std_msgs/Bool.h>
 //C++
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +43,7 @@ class PathPlanning
 		ros::Publisher C_pub;
 		ros::Publisher Path_pub; // publish set of points for rviz
 		ros::Publisher Path_follower_pub; //publish for pathfollower
+		ros::Publisher Follower_stop_pub;
 		tf::TransformListener listener;
 		//for updating only when dif
 		ros::Time t_update; // For OG callback
@@ -89,7 +91,8 @@ class PathPlanning
 			C_pub  = n.advertise<nav_msgs::OccupancyGrid>("/maze_CSpace",1000);
 			Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 			Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
-		}
+			Follower_stop_pub = n.advertise<std_msgs::Bool>("/robot/stop",0);
+		}	
 		double checkwall(const int index_now);
    		double  heuristic(const point& p1, const point& p2);
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -200,6 +203,9 @@ if(initialized == false) return; // suspend loop until the OccupancyGrid is load
 
 if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	if(path_list.size()==0){
+	std_msgs::Bool followerstop;
+	followerstop.data = true;
+	Follower_stop_pub.publish(followerstop);
 	Path(x_start,y_start,x_goal,y_goal);
 	}
 
