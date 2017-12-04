@@ -22,7 +22,7 @@ class ObjectAddition
 		ros::Publisher occupgrid_pub;
 		ros::Time last_position_stamp;
 		std::list<ras_msgs::RAS_Evidence> waiting_objects;
-		std::list<float[4]> classified_objects;
+		std::list< std::vector<float> > classified_objects;
 		std::string filename;
 
 	public:
@@ -44,7 +44,7 @@ class ObjectAddition
 		void classificationCallback(const ras_project_camera::StringStamped::ConstPtr& msg);
 		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void object_add(void);
-		int classification_string_to_int(char* classification);
+		int classification_string_to_int(std::string classification);
 		float classification_to_radius(int classification);
 };
 
@@ -56,7 +56,7 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 		if (timestamp == it->stamp)
 			break;
 	}
-	for (std::list<float[4]>::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
 	{
 		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]) && std::abs(msg->transform.translation.z - (*it_bis)[2]) < 0.02)
 		{
@@ -84,14 +84,14 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 			waiting_objects.erase(waiting_objects.begin());
 		}
 		waiting_objects.front().object_location = *msg;
-		if (waiting_objects.front().image_evidence && waiting_objects.front().object_id)
+		if (waiting_objects.front().image_evidence.header.stamp.toSec() != 0.0 && waiting_objects.front().object_id != "")
 		{
 			evidence_pub.publish(waiting_objects.front());
-			float object[] = new float[4];
+			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
 			object[1] = waiting_objects.front().object_location.transform.translation.y;
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
-			object[3] = classification_string_to_int(waiting_objects.front().object_id);
+			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
 			delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
@@ -114,7 +114,7 @@ void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped:
 		if (timestamp == it->stamp)
 			break;
 	}
-	for (std::list<float[4]>::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
 	{
 		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]))
 		{
@@ -131,7 +131,7 @@ void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped:
 		delete(&(*it));
 		waiting_objects.erase(it);
 	}
-	float object[] = new float[4];
+	std::vector<float> object(4);
 	object[0] = msg->transform.translation.x;
 	object[1] = msg->transform.translation.y;
 	object[2] = msg->transform.translation.z;
@@ -154,7 +154,7 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 		if (timestamp == it->stamp)
 			break;
 	}
-	for (std::list<float[4]>::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
 	{
 		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]) && std::abs(msg->transform.translation.z - (*it_bis)[2]) < 0.02)
 		{
@@ -171,7 +171,7 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 		delete(&(*it));
 		waiting_objects.erase(it);
 	}
-	float object[] = new float[4];
+	std::vector<float> object(4);
 	object[0] = msg->transform.translation.x;
 	object[1] = msg->transform.translation.y;
 	object[2] = msg->transform.translation.z;
@@ -186,7 +186,7 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 	return;
 }
 
-void ObjectAddition::classificationCallback (const std_msgs::StringStamped::ConstPtr& msg) {
+void ObjectAddition::classificationCallback (const ras_project_camera::StringStamped::ConstPtr& msg) {
 	ros::Time timestamp = msg->header.stamp;
 	std::list<ras_msgs::RAS_Evidence>::iterator it;
 	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
@@ -210,14 +210,14 @@ void ObjectAddition::classificationCallback (const std_msgs::StringStamped::Cons
 			waiting_objects.erase(waiting_objects.begin());
 		}
 		waiting_objects.front().object_id = msg->data;
-		if (waiting_objects.front().image_evidence && waiting_objects.front().object_location)
+		if (waiting_objects.front().image_evidence.header.stamp.toSec() != 0.0 && waiting_objects.front().object_location.header.stamp.toSec() != 0.0)
 		{
 			evidence_pub.publish(waiting_objects.front());
-			float object[] = new float[4];
+			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
 			object[1] = waiting_objects.front().object_location.transform.translation.y;
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
-			object[3] = classification_string_to_int(waiting_objects.front().object_id);
+			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
 			delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
@@ -233,6 +233,7 @@ void ObjectAddition::classificationCallback (const std_msgs::StringStamped::Cons
 }
 
 void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
+	ros::Time timestamp = msg->header.stamp;
 	std::list<ras_msgs::RAS_Evidence>::iterator it;
 	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
 	{
@@ -249,20 +250,20 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 	}
 	else
 	{
-		while (timestamp != waiting_objects.front.stamp)
+		while (timestamp != waiting_objects.front().stamp)
 		{
 			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
 			waiting_objects.erase(waiting_objects.begin());
 		}
-		waiting_objects.front.image_evidence = *msg;
-		if (waiting_objects.front().image_evidence && waiting_objects.front().object_location)
+		waiting_objects.front().image_evidence = *msg;
+		if (waiting_objects.front().object_id != "" && waiting_objects.front().object_location.header.stamp.toSec() != 0.0)
 		{
 			evidence_pub.publish(waiting_objects.front());
-			float object[] = new float[4];
+			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
 			object[1] = waiting_objects.front().object_location.transform.translation.y;
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
-			object[3] = classification_string_to_int(waiting_objects.front().object_id);
+			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
 			delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
@@ -277,7 +278,7 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 	return;
 }
 
-int ObjectAddition::classification_string_to_int(char* classification)
+int ObjectAddition::classification_string_to_int(std::string classification)
 {
 	if (classification == "An object")
 		return 1;
@@ -355,7 +356,6 @@ float ObjectAddition::classification_to_radius(int classification)
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "object_addition");
-    PathFollowing P;
     ros::Rate r(100);
     while(ros::ok()) {
 	ros::spinOnce();

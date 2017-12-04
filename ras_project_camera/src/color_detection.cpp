@@ -155,7 +155,7 @@ public:
   cv::minEnclosingCircle(contours[i], c, r);
 
   if ( r >= minTargetRadius && r <= maxTargetRadius)
-  {
++6+++  {
     center.push_back(c);
     radius.push_back(r);
   }
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
   ros::Rate loop_rate(10);
   while (ros::ok())
   {
-    std::cerr << "minTargetRadius, maxTargetRadius " << ic.minTargetRadius << " " << ic.maxTargetRadius << std::endl;
+   // std::cerr << "minTargetRadius, maxTargetRadius " << ic.minTargetRadius << " " << ic.maxTargetRadius << std::endl;
     if (ic.has_image) 
     {
       static int image_count = 0;

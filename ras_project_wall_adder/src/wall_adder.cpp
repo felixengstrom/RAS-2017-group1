@@ -54,11 +54,11 @@ class WallAdder{
         tf::TransformListener listener;
 
         // Private methods
-        void publishPOI(std::vector<float> dists);
         void addWall(Line line);
         void removeWall(Line line);
 
     public:
+        void publishPOI(std::vector<float> dists);
         void loadMap();
         // Constructor
         WallAdder( std::string map_file_, std::string new_map_file_, float POImaxDist_,
@@ -112,7 +112,7 @@ void WallAdder::publishMap()
     visualization_msgs::MarkerArray all_markers;
     visualization_msgs::Marker wall_marker;
     wall_marker.header.frame_id = "map";
-    wall_marker.header.stamp = ros::Time();
+    wall_marker.header.stamp = ros::Time::now();
     wall_marker.ns = "world";
     wall_marker.type = visualization_msgs::Marker::CUBE;
     wall_marker.action = visualization_msgs::Marker::ADD;
@@ -195,6 +195,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 
     std::vector<int> wall_id(360, -1);
     std::vector<float> dists = rayTrace(x, y, angle, wall_id);
+    std::vector<float> dists2(dists);
     std::vector<int> pointsOfInterest(dists.size());
     for (int i  = 0; i< truey.ranges.size(); i++){
         double lidar_range = truey.ranges[i];
@@ -206,18 +207,20 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         double dist_l = map_range_l - lidar_range;
         double to_close = std::min(std::min(dist_r, dist_m), dist_l);
         double to_far = std::max(std::max(dist_r, dist_m), dist_l);
+        //ROS_INFO("lidar range: %f,to far: %f", lidar_range, to_far);
+        //ROS_INFO("map_range: %f,map_range_r: %f,map_range_l: %f", map_range, map_range_r, map_range_l);
         if (lidar_range < POImaxDist and to_close > POIminError ) {
-            dists[i] = lidar_range;
+            dists2[i] = lidar_range;
             pointsOfInterest[i] = 1;
-        }else if (lidar_range < POImaxDist and to_far < -POIminError ){
-            ROS_INFO("so this just happened..!");
-            dists[i] = map_range;
+        }else if (map_range < POImaxDist and to_far < -POIminError ){
+            dists2[i] = map_range;
             pointsOfInterest[i] = 2;
         }else{
             pointsOfInterest[i] = 0;
-            dists[i] = std::numeric_limits<double>::infinity();
+            dists2[i] = std::numeric_limits<double>::infinity();
         }
     }
+    dists = dists2;
     int first = 0; 
     int last = 0;
     int firstMax = 0;
@@ -276,7 +279,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         }
         j++;
     }
-    ROS_INFO("countMax %d, firstMax %d, lastMax %d, typMax %d", countMax, firstMax, lastMax, typeMax);
+    //ROS_INFO("countMax %d, firstMax %d, lastMax %d, typMax %d", countMax, firstMax, lastMax, typeMax);
     // Calculate wall
     if (countMax>minPOI and typeMax==1)
     {
@@ -295,7 +298,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         map.push_back(line);
         addWall(line);
 
-        ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
+        //ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
     }
     
     int w_id = wall_id[firstMax];
@@ -305,10 +308,11 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         removeWall(map[w_id]);
         map.erase(map.begin()+w_id);
     }
+    publishPOI(dists);
 }
 void WallAdder::addWall(Line line){
 
-        ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
+        //ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
         geometry_msgs::PoseArray pa;
         geometry_msgs::Pose p1;
         geometry_msgs::Pose p2;
@@ -324,12 +328,12 @@ void WallAdder::addWall(Line line){
         pa.header = h;
         pa.poses = poses;
         wall_pub.publish(pa);
-        ROS_INFO("added? wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
+        //ROS_INFO("added? wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
 }
 
 void WallAdder::removeWall(Line line){
 
-        ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
+        //ROS_INFO("adding wall x1: %f,  y1: %f,  x2: %f ", line.x1, line.y1, line.x2);
         geometry_msgs::PoseArray pa;
         geometry_msgs::Pose p1;
         geometry_msgs::Pose p2;
@@ -525,6 +529,6 @@ int main(int argc, char*argv[])
         rate.sleep();
 
     }
-    wa.saveMap(new_map_file);
+    //wa.saveMap(new_map_file);
 
 }

@@ -43,7 +43,7 @@ public:
   void detection_cb(const std_msgs::Bool::ConstPtr& msg)
   {
     object_detected = msg->data;
-    std::cerr << "object_detected" << object_detected << std::endl;
+    //std::cerr << "object_detected" << object_detected << std::endl;
   }
 
   void object_coord_cb (const geometry_msgs::PointStamped::ConstPtr& object_coord_msg)
@@ -59,7 +59,7 @@ public:
   {
     pcl::fromROSMsg(*cloud_msg, point_pcl);
     has_cloud = true;
-    std::cerr << "has cloud " << has_cloud << std::endl;  
+    //std::cerr << "has cloud " << has_cloud << std::endl;  
   }
 
 };
@@ -73,7 +73,7 @@ int main (int argc, char** argv)
   while (ros::ok())
   {
     
-    std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
+    //std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
     if (ic.object_detected && ic.has_cloud && ic.has_coord_msg)
       {
         int width = ic.point_pcl.width;
@@ -96,7 +96,7 @@ int main (int argc, char** argv)
         {
           pcl_index = (ic.pixel_y+dy[i])*width + (ic.pixel_x+dx[i]);
           p = ic.point_pcl.at(pcl_index);
-          std::cerr << "x y z  " <<p.x << " "<< p.y <<" " <<p.z<< std::endl;
+          //std::cerr << "x y z  " <<p.x << " "<< p.y <<" " <<p.z<< std::endl;
         } 
         
         geometry_msgs::PointStamped coord_from_camera;

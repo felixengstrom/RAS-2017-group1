@@ -196,7 +196,6 @@ int main (int argc, char** argv)
       trap_coord.point.z = centroid[1];
       ic.pub_trap_coord.publish (trap_coord);
     }
-
     // battery detection
     else if (object_size > ic.min_battery_size && !ic.color_detected && !ic.hasBarcode)
     {
@@ -225,7 +224,7 @@ int main (int argc, char** argv)
       //std::cout << "x_value " << x_value <<std::endl;
 
       float angle = atan2(z_value, x_value)*180.0/M_PI;
-      std::cout << "angle: " << angle <<std::endl;
+      //std::cout << "angle: " << angle <<std::endl;
 
 
       battery_coord.quaternion.x = cloud_filtered->points[z_min_ind].z;
@@ -246,7 +245,6 @@ int main (int argc, char** argv)
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
     //std::cerr << "time of one loop "<< elapsed << std::endl;
     loop_rate.sleep();
-    
   }
   return 0;
 }

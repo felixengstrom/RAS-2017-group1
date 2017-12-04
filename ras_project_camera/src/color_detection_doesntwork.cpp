@@ -175,7 +175,6 @@ public:
         index = idx;
      }
     }
-    std::cerr << "index " << index << std::endl;
     cv::Mat rgb_filtered_frame;
     std::cerr << "value of rgb " << centers.at<double>(0,0) << std::endl;
     int r_min = int (centers.at<double>(index,0) - 5);
@@ -196,36 +195,34 @@ public:
     cv::cvtColor(rgb_frame, hsv_frame, CV_RGB2HSV);
     lastReading = msg->header.stamp;
     has_image = true;
+    
   }
 
-  std::vector<cv::Point2i> color_filter(const cv::Mat& hsv_frame, int h_min, int s_min, int v_min,
+  cv::Mat color_filter(const cv::Mat& hsv_frame, int h_min, int s_min, int v_min,
     int h_max, int s_max, int v_max)
  {
-  cv::Mat thresholded_frame;
+  cv::Mat thresholded;
+      std::cerr << "in color filter " <<  std::endl;
+
   cv::Scalar min(h_min,s_min,v_min);
   cv::Scalar max(h_max,s_max,v_max);
 
-  cv::inRange(hsv_frame, min, max, thresholded_frame);
+  cv::inRange(hsv_frame, min, max, thresholded);
   // Morphological opening
-  cv::erode(thresholded_frame, thresholded_frame, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
-  cv::dilate(thresholded_frame, thresholded_frame, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
+  cv::erode(thresholded, thresholded, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
+  cv::dilate(thresholded, thresholded, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
   // Morphological closing 
-  cv::dilate(thresholded_frame, thresholded_frame, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
-  cv::erode(thresholded_frame, thresholded_frame, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
+  cv::dilate(thresholded, thresholded, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
+  cv::erode(thresholded, thresholded, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(morph,morph)));
 
-  cv::vector<cv::vector<cv::Point> > contours;
+  /*/cv::vector<cv::vector<cv::Point> > contours;
   cv::vector<cv::Vec4i> heirarchy;
-  cv::vector<cv::Point2i> center;
-  cv::vector<int> radius;
-  cv::findContours(thresholded_frame.clone(), contours, heirarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
-  size_t count = contours.size();
-  for( int i=0; i < count; i++)
+  
   {
   cv::Point2f c;
   float r;
-  cv::minEnclosingCircle(contours[i], c, r);
 
-  if ( r >= minTargetRadius && r <= maxTargetRadius)
+  cv::minEnclosingCircle(contours[i], c, r);
   {
     center.push_back(c);
     radius.push_back(r);
@@ -239,9 +236,9 @@ public:
   }
   cv::imshow(OPENCV_WINDOW, thresholded_frame);
   cv::waitKey(3);
-  }
+  }*/
 
-  return center;
+  return thresholded;
  }
 
 };
@@ -252,6 +249,7 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
   ImageConverter ic;
   //std::cerr << "in main" << std::endl;
   ros::Rate loop_rate(10);
+  cv::Mat thresholded_frame;
   while (ros::ok())
   {
     std::cerr << "minTargetRadius, maxTargetRadius " << ic.minTargetRadius << " " << ic.maxTargetRadius << std::endl;
@@ -261,7 +259,7 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       
       //color processing
 
-      std::vector<cv::Point2i> green_center = ic.color_filter(ic.hsv_frame, ic.green_h_min,ic.green_s_min,ic.green_v_min,
+      /*std::vector<cv::Point2i> green_center = ic.color_filter(ic.hsv_frame, ic.green_h_min,ic.green_s_min,ic.green_v_min,
         ic.green_h_max,ic.green_s_max,ic.green_v_max);
 
       std::vector<cv::Point2i> blue_center = ic.color_filter(ic.hsv_frame, ic.blue_h_min,ic.blue_s_min,ic.blue_v_min,
@@ -270,9 +268,8 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       std::vector<cv::Point2i> red_center = ic.color_filter(ic.hsv_frame, ic.red_h_min,ic.red_s_min,ic.red_v_min,
         ic.red_h_max,ic.red_s_max,ic.red_v_max);
 
-      /*std::vector<cv::Point2i> yellow_center = ic.color_filter(ic.hsv_frame, ic.yellow_h_min,ic.yellow_s_min,ic.yellow_v_min,
-        ic.yellow_h_max,ic.yellow_s_max,ic.yellow_v_max);*/
-
+      std::vector<cv::Point2i> yellow_center = ic.color_filter(ic.hsv_frame, ic.yellow_h_min,ic.yellow_s_min,ic.yellow_v_min,
+        ic.yellow_h_max,ic.yellow_s_max,ic.yellow_v_max);
       std::vector<cv::Point2i> purple_center = ic.color_filter(ic.hsv_frame, ic.purple_h_min,ic.purple_s_min,ic.purple_v_min,
         ic.purple_h_max,ic.purple_s_max,ic.purple_v_max);
 
@@ -280,8 +277,6 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
         ic.orange_h_max,ic.orange_s_max,ic.orange_v_max);
 
       std::cerr << "-----------------" << std::endl;
-
-
       //std::vector<vector<Point2i> > centers;
       
       std::cerr << "green center " << green_center << std::endl;
@@ -295,21 +290,51 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       std::cerr << "purple_center " << purple_center << std::endl;
       centers.push_back(purple_center);
       std::cerr << "orange_center " << orange_center << std::endl;
-      centers.push_back(orange_center);
-
+      centers.push_back(orange_center);*/
+      cv::Mat thresholded_frame1 = ic.color_filter(ic.hsv_frame,ic.green_h_min,ic.green_s_min,ic.green_v_min,ic.green_h_max,ic.green_s_max,ic.green_v_max);
+/*      cv::Mat thresholded_frame2 = ic.color_filter(ic.hsv_frame,ic.blue_h_min,ic.blue_s_min,ic.blue_v_min,ic.blue_h_max,ic.blue_s_max,ic.blue_v_max);
+      cv::Mat thresholded_frame3 = ic.color_filter(ic.hsv_frame,ic.red_h_min,ic.red_s_min,ic.red_v_min,ic.red_h_max,ic.red_s_max,ic.red_v_max);
+      cv::Mat thresholded_frame4 = ic.color_filter(ic.hsv_frame,ic.yellow_h_min,ic.yellow_s_min,ic.yellow_v_min,ic.yellow_h_max,ic.yellow_s_max,ic.yellow_v_max);
+      cv::Mat thresholded_frame5 = ic.color_filter(ic.hsv_frame,ic.purple_h_min,ic.purple_s_min,ic.purple_v_min,ic.purple_h_max,ic.purple_s_max,ic.purple_v_max);
+      cv::Mat thresholded_frame6 = ic.color_filter(ic.hsv_frame,ic.orange_h_min,ic.orange_s_min,ic.orange_v_min,ic.orange_h_max,ic.orange_s_max,ic.orange_v_max);
+    */
+      /*thresholded_frame = max(thresholded_frame1,thresholded_frame2);
+      thresholded_frame = max(thresholded_frame,thresholded_frame3);
+      thresholded_frame = max(thresholded_frame,thresholded_frame4);
+      thresholded_frame = max(thresholded_frame,thresholded_frame5);
+      thresholded_frame = max(thresholded_frame,thresholded_frame6);
+*/
+      thresholded_frame = thresholded_frame1;
+      cv::vector<cv::vector<cv::Point> >contours;
+      cv::vector<cv::Vec4i> heirarchy;
+      cv::vector<cv::Point2i> center;
+      cv::vector<int> radius;
+      cv::findContours(thresholded_frame.clone(), contours, heirarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
+      size_t count = contours.size();
+      for( int i=0; i < count; i++)
+      {
+        cv::Point2f c;
+        float r;
+        cv::minEnclosingCircle(contours[i], c, r);
+        if ( r >= ic.minTargetRadius && r <= ic.maxTargetRadius)
+ 	{
+          center.push_back(c);
+	  radius.push_back(r);
+	}
+      }
       std_msgs::Bool object_flag;
       geometry_msgs::PointStamped object_coord;
       object_coord.header.stamp = ic.lastReading;
       
-      size_t counts = centers.size();
+      size_t counts = center.size();
       std::cerr << "number of objects " << counts << std::endl;
       //std::cerr << "x and y of centers" << centers << std::endl;
       if (counts!=0)
       { 
         object_flag.data = 1;
 
-        object_coord.point.x = float(centers[0][0]);
-        //object_coord.point.y = centers[0][1];
+        object_coord.point.x = center[0].x;
+        object_coord.point.y = center[0].y;
         ic.object_coord_pub.publish(object_coord);
 
         //Publish object detected image 

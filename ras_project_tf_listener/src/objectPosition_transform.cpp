@@ -74,9 +74,9 @@ void transformPoint(const tf::TransformListener& listener, ros::Publisher map_pu
 	trap_present = false;
     if(TRUE == object_present || trap_present)
     {
+	geometry_msgs::PointStamped point_base;
         try
         {
-            geometry_msgs::PointStamped point_base;
 	    if (object_present == TRUE)
 	    {
             	listener.transformPoint("robot", object_point, point_base);
@@ -117,7 +117,7 @@ void transformPoint(const tf::TransformListener& listener, ros::Publisher map_pu
         mapObjPos_msg.header.frame_id = "map";
         mapObjPos_msg.header.stamp = ros::Time::now();*/
 	geometry_msgs::TransformStamped message;
-	tf::transformStampedTFToMsg(&transform_map, &message);
+	tf::transformStampedTFToMsg(transform_map, message);
 	message.header.stamp = point_base.header.stamp;
 
         map_publisher.publish(message);
@@ -139,8 +139,8 @@ int main(int argc, char** argv)
     trap_present = false;
 
    //we'll transform a point once every second
-   ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(objectMap_publisher)));
-   ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(trapMap_publisher)));
+   ros::Timer timer1 = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(objectMap_publisher)));
+   ros::Timer timer2 = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(trapMap_publisher)));
    //ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformQuaternion, boost::ref(listener), boost::ref(batteryMap_publisher)));
  
    ros::spin();

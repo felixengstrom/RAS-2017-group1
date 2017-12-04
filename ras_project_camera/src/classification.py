@@ -73,11 +73,11 @@ def main(args):
 			#print (pred)
 
 			t1 = time.time()
-			print("prediction time: {:0.3f}s".format(t1-t0))
+			#print("prediction time: {:0.3f}s".format(t1-t0))
 			index, value = max(enumerate(pred), key=operator.itemgetter(1))
 			clas = classes[index]
 			#rospy.loginfo("index %i", index)
-			rospy.loginfo("value %d, object class %s: ", value*100, clas)
+			#rospy.loginfo("value %d, object class %s: ", value*100, clas)
 			# publish if prob higher 70%
 			if (value>0.7):
 				h = std_msgs.msg.Header()
