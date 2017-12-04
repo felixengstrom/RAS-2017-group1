@@ -15,6 +15,7 @@ class PathFollowing
 		ros::Subscriber odometry_sub;
 		ros::Subscriber stop_sub;
 		ros::Subscriber slowdown_sub;
+		ros::Subscriber odomdiff_sub;
 		geometry_msgs::PoseArray poses;
 		int closest_line;
 		int nb_poses;
@@ -36,16 +37,18 @@ class PathFollowing
 		first = false;
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();
-    		teleop_sub = n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
-    		odometry_sub = n.subscribe("/robot/pose", 10, &PathFollowing::odometryCallback,this);
+        teleop_sub= n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
+        odometry_sub = n.subscribe("/robot/pose", 10, &PathFollowing::odometryCallback,this);
 		stop_sub = n.subscribe("/robot/stop", 10, &PathFollowing::stopCallback,this);
 		slowdown_sub = n.subscribe("/pathFollow/slowDown", 10, &PathFollowing::slowdownCallback,this);
-    		motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
+		odomdiff_sub = n.subscribe("/robot/odomdiff", 1, &PathFollowing::odomdiffCallback,this);
+        motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
 	}
 		void teleopCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
 		void odometryCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 		void stopCallback(const std_msgs::Bool::ConstPtr& msg);
 		void slowdownCallback(const std_msgs::Bool::ConstPtr& msg);
+		void odomdiffCallback(const std_msgs::Bool::ConstPtr& msg);
 };
 
 void PathFollowing::slowdownCallback(const std_msgs::Bool::ConstPtr& msg) {
@@ -53,6 +56,22 @@ void PathFollowing::slowdownCallback(const std_msgs::Bool::ConstPtr& msg) {
 	    speed = 0.1;
 	else
 	    speed = normal_speed;
+}
+
+void PathFollowing::odomdiffCallback(const std_msgs::Bool::ConstPtr& msg) {
+    ros::Rate r(10);
+    for (int i = 0; i<3; i++)
+    {
+	    geometry_msgs::Twist move;
+	    move.linear.x = -0.1;
+	    move.angular.z = 0.0;
+	    motor_pub.publish(move);
+        r.sleep();
+    }
+    for (int i = 0; i<5; i++)
+    {
+        r.sleep();
+    }
 }
 
 void PathFollowing::teleopCallback (const geometry_msgs::PoseArray::ConstPtr& msg) {
