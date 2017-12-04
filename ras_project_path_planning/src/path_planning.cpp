@@ -9,6 +9,7 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
+#include <std_msgs/Bool.h>
 //C++
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@ struct point {
 	int y;
 	double g;
 	double f;
+	double gex;
 	};
 bool cmp(const std::pair<int,point>& s1, const std::pair<int,point>& s2)
 { return s1.second.f  < s2.second.f ; }
@@ -41,6 +43,8 @@ class PathPlanning
 		ros::Publisher C_pub;
 		ros::Publisher Path_pub; // publish set of points for rviz
 		ros::Publisher Path_follower_pub; //publish for pathfollower
+		ros::Publisher Follower_stop_pub; //Publish to Follower to stop, used while replanning path
+		ros::Publisher Path_unreachable_pub; //Publish unreachable message when point unreachable
 		tf::TransformListener listener;
 		//for updating only when dif
 		ros::Time t_update; // For OG callback
@@ -63,13 +67,15 @@ class PathPlanning
 		ros::Time pathTime;
 		//Path Smoothing
 		std::vector<int> path_list;
+		double gradient;
+		bool newtry;
 		//A* Heuristic wall avoiding value
 		int Wall_step;
 		double Wall_cost;
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
+		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1),newtry(false) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 			n = ros::NodeHandle("~");
@@ -77,15 +83,18 @@ class PathPlanning
             ROS_INFO("wall step %d", Wall_step);
 			n.param<double>("Wall_cost",Wall_cost,0);
 			n.param<int>("Wall_tolerance",Wall_tolerance,0);
+			ROS_INFO_STREAM("Wall_step: " << Wall_step << " Wall_cost: " << Wall_cost);
 			t_update=ros::Time::now();
 			goal_update=ros::Time::now();
 			curr_sub = n.subscribe("/robot/pose",10,&PathPlanning::CurrCallback,this);
 			OG_sub = n.subscribe("/maze_OccupancyGrid",10,&PathPlanning::OGCallback,this);
 			goal_sub= n.subscribe("/robot/goal",10,&PathPlanning::GoalCallback,this);
-			C_pub  = n.advertise<nav_msgs::OccupancyGrid>("//maze_CSpace",1000);
+			C_pub  = n.advertise<nav_msgs::OccupancyGrid>("/maze_CSpace",1000);
 			Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 			Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
-		}
+			Follower_stop_pub = n.advertise<std_msgs::Bool>("/robot/stop",0);
+			Path_unreachable_pub = n.advertise<std_msgs::Bool>("/path/unreachable",0);
+		}	
 		double checkwall(const int index_now);
    		double  heuristic(const point& p1, const point& p2);
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -96,8 +105,43 @@ class PathPlanning
 		void Reconstruct_path(int curr_index); //Reconstruct path from Path() WITH SMOOTHING
 		bool Checkline(int start, int goal); //used in Reconstruct_path, check if line between two points [start,goal] is empty
 		void loop_function();
+		bool Gradientsmoothing(int start, int goal);
 };
 
+bool PathPlanning::Gradientsmoothing(int start, int goal)
+{
+ 	int xs,ys,xg,yg;
+ 	double new_gradient,dx,dy,epsilon;
+	xs = start % _width ;
+	ys = start / _width ;
+	xg = goal % _width ;
+	yg = goal / _width ;
+	dx = (double)(xg-xs);
+	dy = (double)(yg-ys);
+	new_gradient =atan2(dy,dx);
+
+	if(newtry == false) //when new gradient is to be tried
+ 	{
+		gradient = new_gradient;
+		newtry = true;
+		return true;
+	}
+	else
+	{
+		//if(abs(new_gradient-gradient) < epsilon)
+		if(new_gradient==gradient)
+		{
+			return true;
+		}
+		else
+		{
+		//	newtry = false;
+		 	gradient = new_gradient;
+			return false;
+		}
+	}
+
+}
 double PathPlanning::checkwall(const int index_now)
 {
 	int upper_limit = _width*_height;
@@ -122,6 +166,7 @@ double PathPlanning::checkwall(const int index_now)
 					dx=Wall_step-abs(i)+1;
 					dy=Wall_step-abs(j)+1;
 					maxval=sqrt(pow((double)dx,2)+pow((double)dy,2));
+		//			ROS_INFO_STREAM("at x : " << index_now%_width << " y : " << index_now/_width<< "IM RETURNING : " << maxval*Wall_cost);
 					return maxval*Wall_cost;
 	
 				}
@@ -134,6 +179,8 @@ double PathPlanning::checkwall(const int index_now)
 					dx = Wall_step - abs(j)+1;
 					dy = Wall_step - abs(i)+1;
 					maxval=sqrt(pow((double)dx,2)+pow((double)dy,2));
+		//			ROS_INFO_STREAM("at x : " << index_now%_width << " y : " << index_now/_width<<"IM RETURNING : " << maxval*Wall_cost);
+					
 					return maxval*Wall_cost;
 				}
 			}
@@ -141,24 +188,29 @@ double PathPlanning::checkwall(const int index_now)
 			}
 
 		}
-		return maxval*Wall_cost;
 	step++;
 	}
+	return 0;
 }
 double PathPlanning::heuristic(const point& p1, const point& p2)
 {
 	int index_now=p1.x+p1.y*_width;
-	double cost;
-	cost = checkwall(index_now);
+	double cost = 0;
+	//cost = checkwall(index_now);
 	
-	return (double)(cost+sqrt(pow((double)(p1.x+p2.x),2)+pow((double)(p1.y+p2.y),2))); }
+	return (double)(cost+sqrt(pow((double)(p2.x-p1.x),2)+pow((double)(p2.y-p1.y),2))); }
 void PathPlanning::loop_function()
 {
 if(initialized == false) return; // suspend loop until the OccupancyGrid is loaded
 
 if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	if(path_list.size()==0){
-	Path(x_start,y_start,x_goal,y_goal);
+		//Ask Path_following to stop while computing new path
+		std_msgs::Bool followerstop;
+		followerstop.data = true;
+		Follower_stop_pub.publish(followerstop);
+		//--------------------------------------//
+		Path(x_start,y_start,x_goal,y_goal);
 	}
 
 	if(path_list.size()>0){
@@ -254,7 +306,7 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 		if((int)OG[i]!=0)//thicken points/wall
 			{
 				Csp[i]=100;
-				//ROS_INFO_STREAM("for i = " << i << " we have Csp " << (int)Csp[i]<< " cell " << cells );
+				//Csp[i]=(int)OG[i]; //if Csp also 0 - 100 range
 				for(y=0;y<=cells;y++)
 				{
 					for(x=0;x<=cells; x++)
@@ -302,9 +354,8 @@ void PathPlanning::Path(double x0, double y0, double x1, double y1)
 {
 
 //A*
-double rt2 = sqrt(2);
-//int x,y; //Goal pos in meter
-//int x0,y0; // Current Robot position from Odometry
+//double  x1,y1; //Goal pos in meter
+//double x0,y0; // Current Robot position in meter
 int x_cell = (int)(x1/_res);
 int y_cell = (int)(y1/_res);
 
@@ -314,7 +365,7 @@ if(x_cell+y_cell*_width < Csp.size() && x_cell+y_cell*_width >=0)
 {
 if(Csp[x_cell+y_cell*_width]!=0)
 {
-	ROS_INFO_STREAM("thats a wall");
+	ROS_INFO_STREAM("Goal position specified is in a wall, computing closest available point......");
 int step = 1;
 bool loop=true; bool done = false;
 while(loop)
@@ -324,7 +375,7 @@ while(loop)
 	if(done) continue;
 		for(int j = -step; j<=step; j++)
 		{
-			
+			if(done) continue;
 				 if(x_cell+j+(y_cell+i)*_width < Csp.size() && x_cell+j+(y_cell+i)*_width >=0)
 				 {
 					if(Csp[x_cell+j+(y_cell+i)*_width]==0)
@@ -349,10 +400,10 @@ while(loop)
 	}
 	step++;
 	if(step>100)
-	{return; ROS_INFO_STREAM("No goal point found in  " << step << " steps");}
+	{return; ROS_INFO_STREAM("No open goal point found in  " << step << " steps around the original point");}
 }
 }}
-else { ROS_INFO_STREAM(" given goal outside maze");return;}
+else { ROS_INFO_STREAM(" given goal outside maze grid");return;}
 
 if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 {
@@ -360,6 +411,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 	if(Csp[x_Start + y_Start*_width]!=0)
 	{
 		bool loop=true; bool done = false;
+		ROS_INFO_STREAM("start position specified is in a  wall, computing closest available point......");
 		while(loop)
 		{
 			for(int i = -step; i <= step; i+=2*step)
@@ -367,6 +419,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 			if(done) continue;
 				for(int j=-step; j<=step; j++)
 				{
+				if(done) continue;
 				 if(x_Start+j+(y_Start+i)*_width < Csp.size() && x_Start+j+(y_Start+i)*_width >=0)
 				 {
 					if(Csp[x_Start+j+(y_Start+i)*_width]==0)
@@ -402,7 +455,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 	}
 
 }
-else{ROS_INFO_STREAM("Start Position outside maze"); return;}
+else{ROS_INFO_STREAM("Start Position outside maze grid"); return;}
 //Reset values
 path_list.clear();
 cameFrom.clear();
@@ -414,6 +467,7 @@ std::map <int,point> openSet;
 point goalpos;
 goalpos.x = x_cell;
 goalpos.y = y_cell;
+double goalwall_val = checkwall(x_cell+y_cell*_width);
 //start pos
 point startpos; 
 startpos.x=x_Start; 
@@ -424,10 +478,10 @@ int tmp1=startpos.x+_width*startpos.y;
 openSet.insert(std::pair<int,point>(tmp1,startpos));
 cameFrom.insert(std::pair<int,int>(tmp1,tmp1));
 std::map<int,point> closeSet;
-int amount;
-amount=0;
+int closed_size=closeSet.size(); //Check if closeSet is increasing or standing still
+int no_path = true; 
 //Herustic h(s0,s1) = abs(s1-s0)
-while(openSet.size()!=0)
+while(openSet.size()!=0 && no_path)
 {
 	
 	//Check for lowest f value	
@@ -439,6 +493,7 @@ while(openSet.size()!=0)
 	int curr_index = current.x+current.y*_width;
 	if(current.x==goalpos.x && current.y==goalpos.y)
 	{Reconstruct_path(curr_index);return;}
+	
 	closeSet.insert(std::pair<int,point>(curr_index,current));
 	openSet.erase(D);
 	//ROS_INFO_STREAM("comparison: openset size: " << openSet.size() << " also curr_index: " << curr_index << " D : " << D);
@@ -450,31 +505,40 @@ while(openSet.size()!=0)
 			int iter_index = curr_index+j+i*_width;
 		//	ROS_INFO_STREAM("iter_index = " << iter_index << "CSP OF IT = " << (int)Csp[iter_index]);
 			if(iter_index < 0 || iter_index > _width*_height) {continue;} //out of bound
+			//if(Csp[iter_index]!=0|| checkwall(iter_index)>goalwall_val){continue;}//check for wall / obstacle
 			if(Csp[iter_index]!=0){continue;}//check for wall / obstacle
 			
 			if(closeSet.find(iter_index)!=closeSet.end()){continue;}//check if already exist in closedset
 			point neighbour;
 			neighbour.x=current.x+j; neighbour.y=current.y+i;
-			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2)) +checkwall(iter_index); //HERE CHECKWALL
-			neighbour.f=neighbour.g+heuristic(neighbour,goalpos);
+			neighbour.g=current.g+sqrt(pow(i,2)+pow(j,2));
+			neighbour.gex = neighbour.g+checkwall(iter_index);
+			neighbour.f=neighbour.g+checkwall(iter_index)+heuristic(neighbour,goalpos);
 			
 			if(openSet.find(iter_index)==openSet.end()){openSet.insert(std::pair<int,point>(iter_index,neighbour));}//check if already in openset
 			if(cameFrom.find(iter_index)==cameFrom.end()){cameFrom.insert(std::pair<int,int>(iter_index,curr_index));} //add current index to map, with its parent index as value
-			if(neighbour.g >=openSet[iter_index].g){continue;} //if the already in openset have lower g (or same, for previous insertion) this path not optimal, skip
+			if(neighbour.gex >=openSet[iter_index].gex){continue;} //if the already in openset have lower g (or same, for previous insertion) this path not optimal, skip
+			//if(neighbour.g >=openSet[iter_index].g){continue;} //if the already in openset have lower g (or same, for previous insertion) this path not optimal, skip
 			openSet[iter_index].g=neighbour.g;
 			openSet[iter_index].f=neighbour.f;
+			openSet[iter_index].gex=neighbour.gex;
 			cameFrom[iter_index]=curr_index;//update parent to the best parent! (children can choose parents, halleljuah
 			
 
 		}
-	}
-	amount=amount+1;		
+	}		
 	//ROS_INFO_STREAM("A* iteration: " << amount << " size of openSet: " << openSet.size()<< "  D = " << D );
-if(closeSet.size() >= Csp.size())
-{ ROS_INFO_STREAM("Given goal unreachable by pathplanning"); return;}	
+if(closeSet.size() <=closed_size)
+{ 	ROS_INFO_STREAM("Given goal unreachable by pathplanning"); Wall_step = std::max(0,Wall_step-1);
+	std_msgs::Bool notreachable; notreachable.data = false;
+	Path_unreachable_pub.publish(notreachable);       	
+	return;
+}	
+closed_size=closeSet.size();
 }
-
-
+ROS_INFO_STREAM("Given goal is unreachable by pathplanning, publishing false to topic");
+std_msgs::Bool notreachable; notreachable.data = false;
+Path_unreachable_pub.publish(notreachable);       	
 return;
 }
 
@@ -502,17 +566,31 @@ while(parent!=child)
 	child = parent;
 	parent = cameFrom[child];
 //	reverse_path.push_back(parent);
-	//if(checkwall(child)<wallT){continue;}
 	//else if(Checkline(smooth,parent)){continue;}
-	if(Checkline(smooth,parent)){continue;}
-		
-	reverse_smooth.push_back(child);
+	//if(Checkline(smooth,parent)){continue;}
+	if(Gradientsmoothing(child,parent)){continue;}	
+	//reverse_smooth.push_back(child);
+	reverse_smooth.push_back(parent);
 	smooth=child;
 
 }
-reverse_smooth.push_back(parent);
+//reverse_smooth.push_back(parent);
 std::reverse(reverse_smooth.begin(),reverse_smooth.end());
-path_list=reverse_smooth;
+std::vector<int> doublesmooth;
+doublesmooth.push_back(reverse_smooth[0]);
+smooth = reverse_smooth[0];
+for(int i = 1; i<reverse_smooth.size();i++)
+{
+	child = reverse_smooth[i-1];
+	parent = reverse_smooth[i];
+	if(Checkline(smooth,parent)){continue;}
+	doublesmooth.push_back(child);
+	smooth=child;
+}
+doublesmooth.push_back(parent);
+path_list=doublesmooth;
+//path_list=reverse_smooth;
+newtry=false;
 return;
 }
 

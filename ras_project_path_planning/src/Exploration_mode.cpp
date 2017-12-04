@@ -60,6 +60,7 @@ class Exploration
 		bool GO,GO_once;
 		std_msgs::Bool Done; //publish Done when done.
 		int Explore_amount;
+		double exploration_percentage;
 		//-------------------------//
 		
 		//Parameters Initializeable with n.param//
@@ -91,6 +92,7 @@ class Exploration
 			n.param<int>("resolution_cutting",resolution_cutting,10);
 			n.param<double>("foward_margin",forward_exp,0.2);
 			n.param<double>("sideway_margin",sideway_exp,0.2);
+			n.param<double>("exploration_percentage",exploration_percentage,0.5);
 			OG_sub = n.subscribe("/maze_OccupancyGrid",10,&Exploration::OGCallback,this);
 			Csp_sub = n.subscribe("/maze_CSpace",10,&Exploration::CspCallback,this);		
 			sw_sub = n.subscribe("/Exploration/Go",10,&Exploration::SwitchCallback,this);
@@ -212,7 +214,7 @@ double Exploration::calc_explored() //This function calculate and returns the pe
 
 	}
 	double percentage =(double)(explored- Explore_amount)/((double)(Map_size-Explore_amount));
-	ROS_INFO_STREAM("WE have explored: " << percentage);
+//	ROS_INFO_STREAM("WE have explored: " << percentage);
 	return percentage;
 }
 void Exploration::random_search() // Random search based on current explored
@@ -239,7 +241,7 @@ bool loop =true;
 int xCsp = (int)(x/Csp.info.resolution);
 int yCsp = (int)(y/Csp.info.resolution);
 int step = 1;
-ROS_INFO_STREAM("xCsp = " << xCsp << " yCsp = " << yCsp << " resolution = " << Csp.info.resolution << " data size " << Csp.data.size());
+//ROS_INFO_STREAM("xCsp = " << xCsp << " yCsp = " << yCsp << " resolution = " << Csp.info.resolution << " data size " << Csp.data.size());
 if(xCsp+yCsp*Csp.info.width < Csp.data.size() && xCsp+yCsp*Csp.info.width >=0)
 {
 if(Csp.data[xCsp+yCsp*Csp.info.width] == 0)
@@ -453,7 +455,7 @@ if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
 	double percentage_explored = calc_explored();
-	if((percentage_explored) >0.9)
+	if((percentage_explored) >exploration_percentage)
 	{
 		Done.data = true;
 		ROS_INFO_STREAM("We have now explored the amount specified. Done message is now true");
@@ -469,7 +471,7 @@ if(Exp_initialized==true)
 	}
 
 	else if( sqrt(pow(xNow-goal_pos.pose.position.x,2)+pow(yNow - goal_pos.pose.position.y,2)) <0.2 && Csp_received) //New random goal generated when sufficiently close to the previous one
-	{ random_search(); }
+	{ random_search();ROS_INFO_STREAM("New random path, explored: " <<percentage_explored); }
 	if(GO_once && Done.data == false)
 	{
 		//Goal_SC.request.goalPoint.header = goal_pos.header;
