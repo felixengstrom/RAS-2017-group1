@@ -38,7 +38,7 @@ public:
   int minTargetRadius, maxTargetRadius;
   bool detected;
 
-  ImageConverter(): it_(nh_), has_image(0), hsv_frame(), cv_ptr()
+  ImageConverter(): it_(nh_), has_image(0), hsv_frame(), cv_ptr(), minTargetRadius(50), maxTargetRadius(100)
   {
     image_sub_ = it_.subscribe("/camera/rgb/image_raw", 1, &ImageConverter::ImageCb, this);
     image_pub_ = it_.advertise("/camera/thresholded_image", 1);
@@ -161,14 +161,13 @@ public:
 	  center.push_back(c);
 	  radius.push_back(r);
 	}
+  // Visualise
   size_t counts = center.size();
   cv::Scalar red(255,0,0);
   for( int i = 0; i < counts; i++)
   {
     cv::circle(thresholded_frame, center[i], radius[i], red, 3);
   }
-
-
   cv::imshow(OPENCV_WINDOW, thresholded_frame);
   cv::waitKey(3);
 	}
@@ -218,8 +217,8 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       std::cerr << "-----------------" << std::endl;
       for (int j = 0; j<green_center.size(); ++j)
       {
-        std::cerr << "number of objects " << green_center[j] << std::endl;
-      centers.push_back(green_center[j]);
+        std::cerr << "green center " << green_center[j] << std::endl;
+        centers.push_back(green_center[j]);
       }
       std_msgs::Bool object_flag;
       geometry_msgs::Point object_coord;
@@ -232,25 +231,23 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       if (counts!=0)
       { 
         
-      //std::cerr << "x and y of centers" << center << std::endl;
-      object_flag.data = 1;
+        //std::cerr << "x and y of centers" << center << std::endl;
+        object_flag.data = 1;
 
-      object_coord.x = green_center[0].x;
-      object_coord.y = green_center[0].y;
-      
-      // save images                               
-      std::stringstream sstream;                               
-      sstream << "object" << image_count << ".jpg" ;                  
-      ROS_ASSERT( cv::imwrite( sstream.str(), ic.cv_ptr->image) );      
-      image_count++;
-      //std::cerr << "im " << image_count << std::endl;
+        object_coord.x = green_center[0].x;
+        object_coord.y = green_center[0].y;
+        
+        // save images                               
+        std::stringstream sstream;                               
+        sstream << "object" << image_count << ".jpg" ;                  
+        ROS_ASSERT( cv::imwrite( sstream.str(), ic.cv_ptr->image) );      
+        image_count++;
+        //std::cerr << "im " << image_count << std::endl;
       }
 
       else
       {
         object_flag.data = 0;
-        object_coord.x = 0.0;
-        object_coord.y = 0.0;
       }
       ic.object_flag_pub.publish(object_flag);
       ic.object_coord_pub.publish(object_coord);

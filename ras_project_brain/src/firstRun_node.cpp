@@ -21,11 +21,11 @@
 #define PICKUP_OBJECT 5
 #define GOTO_GOAL 6
 #define GOAL_REACHED 7
+#define DONE 8
 
 struct object_details
 {
     geometry_msgs::Point location;
-    std::string colour_type[5];
 };
 
 class FirstRunNode
@@ -38,13 +38,20 @@ public:
     ros::Publisher exploration_command_publisher;
     ros::Publisher objectCoordinateCalc_publisher;
     ros::Publisher robot_destination_publisher;
-    ros::Publisher cameraPcl_publisher;
+    ros::Publisher arm_engageSuction_publisher;
+
+    ros::Publisher uarm_pickup_publisher;
+    ros::Subscriber uarm_pickup_ack_subscriber;
+
+    //ros::Publisher cameraPcl_publisher;
     ros::Subscriber objectDetection_subscriber;
     ros::Subscriber objectClass_subscriber;
     ros::Subscriber objectPosition_subscriber;
     ros::Subscriber explorationCompletion_subscriber;
     ros::Subscriber robot_map_position_subscriber;
+    ros::Subscriber robot_map_update_subscriber;
     tf::TransformListener listener;
+    ros::ServiceClient client;
 
     FirstRunNode()
     {
@@ -52,28 +59,37 @@ public:
         begin = ros::Time::now();
         i = j = 0;
         exploration_start_stop = 0;
-        exploration_completion = 0;
+        exploration_completion = sm_complete_ack =0;
         item_num = 0;
         object_detected_current = object_detected_prev = 0;
         objectDistanceGoal_old = 200.0;
         start_coordCalc = 0;
-        start_pcl = 0;
+        map_coord_updated = 0;
+        //start_pcl = 0;
         slowMotor_toUpdate = 0;
+        uarm_smTrigger = 0;
         current_state = INITIAL_STATE;
         previous_state = OBJ_UPDATION_STATE;
         current_state_exit = START_EXIT_PREPARATION;
         previous_state_exit = GOAL_REACHED;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
         motorStop_publisher = n.advertise<std_msgs::Bool>("/pathFollow/slowDown", 1);
-        cameraPcl_publisher = n.advertise<std_msgs::Bool>("/camera/start_pcl", 1);
+        //cameraPcl_publisher = n.advertise<std_msgs::Bool>("/camera/start_pcl", 1);
         exploration_command_publisher = n.advertise<std_msgs::Bool>("/Exploration/Go",1);
-        objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);
-        robot_destination_publisher = n.advertise<geometry_msgs::PointStamped>("/robot/goal", 1);
+        objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 2);
+        robot_destination_publisher = n.advertise<geometry_msgs::PoseStamped>("/robot/goal", 1);
+        arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
+
+        uarm_pickup_publisher = n.advertise<std_msgs::Bool>("/brain/smStart", 1);
+        uarm_pickup_ack_subscriber = n.subscribe("/brain/smEnd", 3, &FirstRunNode::uarmSMCompleteAckCallback, this);
+
         objectClass_subscriber = n.subscribe("/camera/object_class", 1, &FirstRunNode::objectClassCallback, this);
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &FirstRunNode::objectDetectionCallback, this);
         objectPosition_subscriber = n.subscribe("/map/objectCoord", 1, &FirstRunNode::objectPositionCallback, this);
         explorationCompletion_subscriber = n.subscribe("/Explored/done", 1, &FirstRunNode::explorationCompletionCallback, this);
         robot_map_position_subscriber = n.subscribe("/robot/pose", 1, &FirstRunNode::robotMapPositionCallback, this);
+        robot_map_update_subscriber = n.subscribe("/map/coordUpdate", 1, &FirstRunNode::mapCoordUpdateCallback, this);
+        client = n.serviceClient<ras_project_brain::PickUpObj>("obj_pickup_sm");
     }
 
     ~FirstRunNode()
@@ -106,10 +122,20 @@ public:
         robotPosition = msg->pose.position;
     }
 
+    void mapCoordUpdateCallback(const std_msgs::Bool::ConstPtr &msg)
+    {
+    	map_coord_updated = msg->data;
+    }
+
+    void uarmSMCompleteAckCallback(const std_msgs::Bool::ConstPtr &msg)
+    {
+        sm_complete_ack = msg->data;
+    }
+
     void pExplorationStateMachine()
     {
 
-        if (ros::Time::now()- begin <= ros::Duration(60.0) && exploration_completion!=1 )
+        if (ros::Time::now()- begin <= ros::Duration(30.0) && exploration_completion!=1 )
         {
             ROS_INFO("In state exploration");
             //continue exploration
@@ -132,9 +158,9 @@ public:
                     msg_eSpeak_string.data = classString;
                     objectDetection_publisher.publish(msg_eSpeak_string);
                     /*Start the PCL functionality of the camera */
-                    start_pcl = 1;
+                    /*start_pcl = 1;
                     msg_cameraPcl_startStop_bool.data = start_pcl;
-                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);
+                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/
                     /*Slow the motors to update the position of the object/replan the path*/
                     slowMotor_toUpdate = 1;
                     msg_motorSlowDown_bool.data = slowMotor_toUpdate;
@@ -152,28 +178,19 @@ public:
                 }
                 break;
             case OBJ_DETECTION_STATE:
-                if (INITIAL_STATE == previous_state)
+                if (INITIAL_STATE == previous_state && 1 == map_coord_updated)
                 {
                     ROS_INFO("In state object updated");
                     current_state = OBJ_UPDATION_STATE;
                     previous_state = OBJ_DETECTION_STATE;
-                    /****wait for object update in map****/
-                    //service call
                     /*Update the object in the brain node's database*/
-                    std::istringstream iss(classString);
-                    do
-                    {
-                        iss >> list[i].colour_type[j];
-                        std::cout<<"substring: "<<list[i].colour_type[j]<<std::endl;
-                        j++;
-                     } while (iss);
                     ROS_INFO("Position found: x=%.2f, y=%.2f", list[i].location.x,list[i].location.y);
                     j = 0;
                     i += 1;
                     /*Stop the PCL functionality of the camera */
-                    start_pcl = 0;
+                    /*start_pcl = 0;
                     msg_cameraPcl_startStop_bool.data = start_pcl;
-                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);
+                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/
                     /*Continue motors to run normally*/
                     slowMotor_toUpdate = 0;
                     msg_motorSlowDown_bool.data = slowMotor_toUpdate;
@@ -203,12 +220,12 @@ public:
             msg_exploration_startStop_bool.data = exploration_start_stop;
             exploration_command_publisher.publish(msg_exploration_startStop_bool);
             float distance_robObj;
-            ros::ServiceClient client = n.serviceClient<ras_project_brain::PickUpObj>("obj_pickup_sm");
             std::string exitString("Going home");
             switch(current_state_exit)
             {
                 case START_EXIT_PREPARATION:
                     /* Find the object closer to the goal */
+                	ROS_INFO("Start exit preparation");
                     current_state_exit = GO_TO_OBJECT;
                     for (int obj=0;obj<i;obj++)
                     {
@@ -222,60 +239,97 @@ public:
                     }
                     msg_robotDestination.header.frame_id = "map";
                     msg_robotDestination.header.stamp = ros::Time::now();
-                    msg_robotDestination.point.x = list[item_num].location.x;
-                    msg_robotDestination.point.y = list[item_num].location.y;
-                    msg_robotDestination.point.z = 0.0;
+                    msg_robotDestination.pose.position.x = list[item_num].location.x;
+                    msg_robotDestination.pose.position.y = list[item_num].location.y;
+                    msg_robotDestination.pose.position.z = 0.0;
                     robot_destination_publisher.publish(msg_robotDestination);
                     msg_eSpeak_string.data = exitString;
                     objectDetection_publisher.publish(msg_eSpeak_string);
                 break;
                 case GO_TO_OBJECT:
-                    current_state_exit = GO_TO_OBJECT;
-                    /*if the position is reached*/
-                    do
-                    {
-                        distance_robObj = sqrt(pow((robotPosition.x-list[item_num].location.x),2)+
+                    current_state_exit = PICKUP_OBJECT;
+                    distance_robObj = sqrt(pow((robotPosition.x-list[item_num].location.x),2)+
                             pow((robotPosition.y-list[item_num].location.y),2));
                         ROS_INFO("Distance to the object to be picked: %0.2f", distance_robObj);
-                    }while(distance_robObj>0.26);
+                    /*if the position is not reached*/
+                    if(distance_robObj > 0.3)
+                    {
+                        current_state_exit = GO_TO_OBJECT;
+                    }
                 break;
                 case PICKUP_OBJECT:
                     current_state_exit = GOTO_GOAL;
-                    srv.request.objPickUpState = 1;
+                    /*Start uarm_SM*/
+                    uarm_smTrigger = 1;
+                    msg_uarm_pickup_bool.data = uarm_smTrigger;
+                    uarm_pickup_publisher.publish(msg_uarm_pickup_bool);
+                    if(sm_complete_ack!=1)
+                    {
+                        current_state_exit = PICKUP_OBJECT;
+                    }
+                    /*srv.request.objPickUpState = 1;
                     if (client.call(srv))
                     {
                         ROS_INFO("Object Pickup call success");
                     }
+                    else
+                    {
+                    	ROS_INFO("Warning: Pickup call failed!!");
+                    }*/
+                    /*Stop uarm SM*/
                 break;
                 case GOTO_GOAL:
+                    ROS_INFO("Sent the goal position");
+                    /*Stop the object pickup command*/
+                    uarm_smTrigger = 0;
+                    msg_uarm_pickup_bool.data = uarm_smTrigger;
+                    uarm_pickup_publisher.publish(msg_uarm_pickup_bool);
+                	current_state_exit = GOAL_REACHED;
                     msg_robotDestination.header.frame_id = "map";
                     msg_robotDestination.header.stamp = ros::Time::now();
-                    msg_robotDestination.point.x = 0.0;
-                    msg_robotDestination.point.y = 0.0;
-                    msg_robotDestination.point.z = 0.0;
+                    msg_robotDestination.pose.position.x = 0.0;
+                    msg_robotDestination.pose.position.y = 0.0;
+                    msg_robotDestination.pose.position.z = 0.0;
                     robot_destination_publisher.publish(msg_robotDestination);
                 break;
                 case GOAL_REACHED:
+                    ROS_INFO("Going to the goal position");
+                    current_state_exit = DONE;
                     /*wait till the goal is reached*/
-                    /*drop the object*/
-                    /*disengage suction*/
+                    if (0.15 <= robotPosition.x && 0.15 <= robotPosition.y)
+                    {
+                        current_state_exit = GOAL_REACHED;
+                    }
                 break;
+                case DONE:
+                    ROS_INFO("Completed!!");
+                    current_state_exit = 15;
+                    /*drop the object: service call to uArm*/
+                    /*disengage suction*/
+                    engage_suction = 0;
+                    msg_uarm_engageSuction_bool.data = engage_suction;
+                    arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
+                break;
+                default:
+                    ROS_INFO("Task over");
             }
         }
     }
 
 private:
     std::string classString;
-    bool object_detected_current, start_coordCalc, start_pcl, object_detected_prev;
+    bool object_detected_current, start_coordCalc, start_pcl, object_detected_prev, map_coord_updated;
     bool slowMotor_toUpdate, exploration_start_stop, pickup_object,exploration_completion;
+    bool uarm_smTrigger, sm_complete_ack, engage_suction;
     int current_state, previous_state;
     int current_state_exit, previous_state_exit;
     int item_num;
     float objectDistanceGoal_new,objectDistanceGoal_old;
     std_msgs::String msg_eSpeak_string;
-    geometry_msgs::PointStamped msg_robotDestination;
+    geometry_msgs::PoseStamped msg_robotDestination;
     geometry_msgs::Point robotPosition;
-    std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool,msg_cameraPcl_startStop_bool, msg_motorSlowDown_bool;
+    std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool,msg_cameraPcl_startStop_bool;
+    std_msgs::Bool msg_motorSlowDown_bool, msg_uarm_pickup_bool, msg_uarm_engageSuction_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
     ros::Time begin;
     object_details list[10];

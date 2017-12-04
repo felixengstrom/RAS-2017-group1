@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
 	OpenCV
 	roscpp
 	rospy
+	message_generation
         std_msgs
         tf
         sensor_msgs
@@ -13,11 +14,24 @@ find_package(catkin REQUIRED COMPONENTS
 	pcl_conversions
 	pcl_ros
 )
+catkin_python_setup()
+add_message_files(DIRECTORY msg
+   FILES
+   StringStamped.msg
+   QuaternionStamped.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+)
 
 catkin_package(
 LIBRARIES 
 ras_project_camera
 CATKIN_DEPENDS 
+message_runtime
 roscpp 
 rospy 
 tf 
@@ -28,7 +42,10 @@ cv_bridge
 pcl_conversions
 pcl_ros 
 )
-catkin_python_setup()
+
+
+
+
 
 include_directories(${catkin_INCLUDE_DIRS})
 

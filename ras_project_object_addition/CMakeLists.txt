@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 	cv_bridge
 	pcl_conversions
 	pcl_ros
+	message_generation
 )
 
 catkin_package(
@@ -27,10 +28,12 @@ image_transport
 cv_bridge
 pcl_conversions
 pcl_ros 
+message_runtime
 )
 catkin_python_setup()
 
 include_directories(${catkin_INCLUDE_DIRS})
 
+add_message_files(FILES ../../ras_msgs/msg/RAS_Evidence.msg)
 add_executable(object_addition src/object_addition.cpp)
 target_link_libraries(object_addition ${catkin_LIBRARIES})

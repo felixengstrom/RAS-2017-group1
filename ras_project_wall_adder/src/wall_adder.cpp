@@ -277,7 +277,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         }
         j++;
     }
-    //ROS_INFO("countMax %d, firstMax %d, lastMax %d, typMax %d", countMax, firstMax, lastMax, typeMax);
+    ROS_INFO("countMax %d, firstMax %d, lastMax %d, typMax %d", countMax, firstMax, lastMax, typeMax);
     // Calculate wall
     if (countMax>minPOI and typeMax==1)
     {
@@ -499,13 +499,13 @@ int main(int argc, char*argv[])
     float POImaxDist;
     nh.param<float>("POImaxDist", POImaxDist, 0.7);
     float POIminError;
-    nh.param<float>("POIminError", POIminError, 0.5);
+    nh.param<float>("POIminError", POIminError, 0.1);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 1);
+    nh.param<int>("tolerance", tolerance, 4);
     int minPOI;
-    nh.param<int>("minPOI", minPOI, 10);
+    nh.param<int>("minPOI", minPOI, 15);
     int minPOIremove;
-    nh.param<int>("minPOIremove", minPOIremove, 3);
+    nh.param<int>("minPOIremove", minPOIremove, 10);
 
     std::string map_file;
     nh.param<std::string>("map_file", map_file, "lab_maze_2017.txt");

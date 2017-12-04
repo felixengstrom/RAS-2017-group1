@@ -67,7 +67,7 @@ class OccupancyGrid
     		OG_pub= n.advertise<nav_msgs::OccupancyGrid>( _map_OG,0);
 		wall_sub = n.subscribe("/wall_add",10,&OccupancyGrid::WallCallback,this);
 		object_sub = n.subscribe("/object_add",10,&OccupancyGrid::ObjectCallback,this);
-		wall_remov_sub = n.subscribe("/wall_removve",10,&OccupancyGrid::RemoveWallCallback,this);
+		wall_remov_sub = n.subscribe("/wall_remove",10,&OccupancyGrid::RemoveWallCallback,this);
 		}
 		
 		void loop_function();

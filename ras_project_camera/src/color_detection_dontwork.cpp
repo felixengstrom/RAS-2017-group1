@@ -5,6 +5,7 @@
 #include <sensor_msgs/Image.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+//#include <opencv2/objdetect/objdetect.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Bool.h>
@@ -13,7 +14,7 @@
 #include <sstream>
 
 
-
+using namespace cv;
 static const std::string OPENCV_WINDOW = "Image window";
 
 
@@ -38,7 +39,7 @@ public:
   int yellow_h_max, yellow_s_max, yellow_v_max, yellow_h_min, yellow_s_min, yellow_v_min;
   int purple_h_max, purple_s_max, purple_v_max, purple_h_min, purple_s_min, purple_v_min;
   int orange_h_max, orange_s_max, orange_v_max, orange_h_min, orange_s_min, orange_v_min;
-  
+  int obstacle_h_max, obstacle_s_max, obstacle_v_max, obstacle_h_min, obstacle_s_min, obstacle_v_min;
   
   int minTargetRadius, maxTargetRadius;
   bool detected;
@@ -97,6 +98,13 @@ public:
     nh.getParam("orange_s_min",orange_s_min);
     nh.getParam("orange_v_min",orange_v_min);
 
+    nh.getParam("obstacle_h_max",obstacle_h_max);
+    nh.getParam("obstacle_s_max",obstacle_s_max);
+    nh.getParam("obstacle_v_max",obstacle_v_max);
+    nh.getParam("obstacle_h_min",obstacle_h_min);
+    nh.getParam("obstacle_s_min",obstacle_s_min);
+    nh.getParam("obstacle_v_min",obstacle_v_min);
+
     nh.getParam("morph",morph);
 
     nh.getParam("minTargetRadius",minTargetRadius);
@@ -121,13 +129,76 @@ public:
       ROS_ERROR("cv_bridge exception: %s", e.what());
       return;
     }
+    
+    cv::Mat rgb_resized;
     cv::GaussianBlur(cv_ptr->image, rgb_frame, cv::Size(9,9),50);
+    /*
+    cv::resize(rgb_frame, rgb_resized, cv::Size(), 1.0, 1.0);
+    std::cerr << "rgb_resized size " << rgb_resized.size() << std::endl;
+    cv::Mat samples(rgb_resized.rows * rgb_resized.cols, 3, CV_32F);
+    std::cerr << "samples size " << samples.size() << std::endl;
+    for( int y = 0; y < rgb_resized.rows; y++ )
+      for( int x = 0; x < rgb_resized.cols; x++ )
+        for( int z = 0; z < 3; z++)
+          samples.at<float>(y + x*rgb_resized.rows, z) = rgb_resized.at<Vec3b>(y,x)[z];
+
+    int claster_num = 3;
+    cv::Mat labels;
+    int attempts = 5;
+    cv::Mat centers; 
+    cv::kmeans(samples, claster_num, labels, cv::TermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 100, 2), attempts, KMEANS_RANDOM_CENTERS, centers);
+    
+    std::cerr << "claster_num " << centers << std::endl;
+
+    cv::Mat new_image( rgb_resized.size(), rgb_resized.type());
+    std::cerr << "new_image " << new_image.size() << std::endl;
+  for( int j = 0; j < rgb_resized.rows; j++ )
+    for( int i = 0; i < rgb_resized.cols; i++ )
+    { 
+      int cluster_idx = labels.at<int>(j + i*rgb_resized.rows,0);
+      new_image.at<Vec3b>(j,i)[0] = centers.at<float>(cluster_idx, 0);
+      new_image.at<Vec3b>(j,i)[1] = centers.at<float>(cluster_idx, 1);
+      new_image.at<Vec3b>(j,i)[2] = centers.at<float>(cluster_idx, 2);
+    }
+  cv::imshow(OPENCV_WINDOW, new_image);  
+  cv::waitKey(3);
+    
+    int maximum = -1; int index = -1; int count = 0;
+    int classes[claster_num];
+    for (int i=0;i<labels.rows;i++)
+    {
+      int idx = labels.at<int>(i,0);
+      classes[idx]++;
+      if (classes[idx] > maximum)
+      {
+        maximum = classes[idx];
+        index = idx;
+     }
+    }
+    std::cerr << "index " << index << std::endl;
+    cv::Mat rgb_filtered_frame;
+    std::cerr << "value of rgb " << centers.at<double>(0,0) << std::endl;
+    int r_min = int (centers.at<double>(index,0) - 5);
+    int r_max = int (centers.at<double>(index,0) + 5);
+    int g_min = int (centers.at<double>(index,0) - 5);
+    int g_max = int (centers.at<double>(index,0) + 5);
+    int b_min = int (centers.at<double>(index,0) - 5);
+    int b_max = int (centers.at<double>(index,0) + 5);
+
+    cv::Scalar min(r_min,g_min,b_min);
+    cv::Scalar max(r_max,g_max,b_max);
+
+    cv::inRange(rgb_frame, min, max, rgb_filtered_frame);
+
+    cv::cvtColor(rgb_filtered_frame, hsv_frame, CV_RGB2HSV);
+    cv::imshow(OPENCV_WINDOW, rgb_filtered_frame);  
+    cv::waitKey(3);*/
     cv::cvtColor(rgb_frame, hsv_frame, CV_RGB2HSV);
     lastReading = msg->header.stamp;
     has_image = true;
   }
 
-  /*std::vector<cv::Point2i> color_filter(const cv::Mat& hsv_frame, int h_min, int s_min, int v_min,
+  std::vector<cv::Point2i> color_filter(const cv::Mat& hsv_frame, int h_min, int s_min, int v_min,
     int h_max, int s_max, int v_max)
  {
   cv::Mat thresholded_frame;
@@ -169,8 +240,9 @@ public:
   cv::imshow(OPENCV_WINDOW, thresholded_frame);
   cv::waitKey(3);
   }
+
   return center;
- }*/
+ }
 
 };
 
@@ -178,10 +250,6 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
 {
   ros::init(argc, argv, "color_detection");
   ImageConverter ic;
-
-  cv::Mat thresholded_frame, thresholded_frame1, thresholded_frame2, thresholded_frame3, 
-  thresholded_frame4, thresholded_frame5, thresholded_frame6, thresholded_frame7;
-  
   //std::cerr << "in main" << std::endl;
   ros::Rate loop_rate(10);
   while (ros::ok())
@@ -190,118 +258,58 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
     if (ic.has_image) 
     {
       static int image_count = 0;
-
-      //Image processing
-
-      cv::Scalar green_min(ic.green_h_min,ic.green_s_min,ic.green_v_min);
-      cv::Scalar green_max(ic.green_h_max,ic.green_s_max,ic.green_v_max);
-
-      cv::Scalar blue_min(ic.blue_h_min,ic.blue_s_min,ic.blue_v_min);
-      cv::Scalar blue_max(ic.blue_h_max,ic.blue_s_max,ic.blue_v_max);
-
-      cv::Scalar red_min(ic.red_h_min,ic.red_s_min,ic.red_v_min);
-      cv::Scalar red_max(ic.red_h_max,ic.red_s_max,ic.red_v_max);
-
-      cv::Scalar yellow_min(ic.yellow_h_min,ic.yellow_s_min,ic.yellow_v_min);
-      cv::Scalar yellow_max(ic.yellow_h_max,ic.yellow_s_max,ic.yellow_v_max);
-
-      cv::Scalar purple_min(ic.purple_h_min,ic.purple_s_min,ic.purple_v_min);
-      cv::Scalar purple_max(ic.purple_h_max,ic.purple_s_max,ic.purple_v_max);
-
-      cv::Scalar orange_min(ic.orange_h_min,ic.orange_s_min,ic.orange_v_min);
-      cv::Scalar orange_max(ic.orange_h_max,ic.orange_s_max,ic.orange_v_max);
-
-      cv::inRange(ic.hsv_frame, green_min, green_max, thresholded_frame1);
-      cv::inRange(ic.hsv_frame, blue_min, blue_max, thresholded_frame2);
-      cv::inRange(ic.hsv_frame, red_min, red_max, thresholded_frame3);
-      cv::inRange(ic.hsv_frame, yellow_min, yellow_max, thresholded_frame4);
-      cv::inRange(ic.hsv_frame, purple_min, purple_max, thresholded_frame5);
-      cv::inRange(ic.hsv_frame, orange_min, orange_max, thresholded_frame6);
-
-      // Morphological opening
-      cv::erode(thresholded_frame1, thresholded_frame1, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::dilate(thresholded_frame1, thresholded_frame1, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      // Morphological closing 
-      cv::dilate(thresholded_frame1, thresholded_frame1, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::erode(thresholded_frame1, thresholded_frame1, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-
-      // Morphological opening
-      cv::erode(thresholded_frame2, thresholded_frame2, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::dilate(thresholded_frame2, thresholded_frame2, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      // Morphological closing 
-      cv::dilate(thresholded_frame2, thresholded_frame2, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::erode(thresholded_frame2, thresholded_frame2, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-
-      // Morphological opening
-      cv::erode(thresholded_frame3, thresholded_frame3, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::dilate(thresholded_frame3, thresholded_frame3, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      // Morphological closing 
-      cv::dilate(thresholded_frame3, thresholded_frame3, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::erode(thresholded_frame3, thresholded_frame3, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-
-      // Morphological opening
-      cv::erode(thresholded_frame4, thresholded_frame4, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::dilate(thresholded_frame4, thresholded_frame4, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      // Morphological closing 
-      cv::dilate(thresholded_frame4, thresholded_frame4, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::erode(thresholded_frame4, thresholded_frame4, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-
-      // Morphological opening
-      cv::erode(thresholded_frame5, thresholded_frame5, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::dilate(thresholded_frame5, thresholded_frame5, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      // Morphological closing 
-      cv::dilate(thresholded_frame5, thresholded_frame5, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::erode(thresholded_frame5, thresholded_frame5, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-
-      // Morphological opening
-      cv::erode(thresholded_frame6, thresholded_frame6, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::dilate(thresholded_frame6, thresholded_frame6, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      // Morphological closing 
-      cv::dilate(thresholded_frame6, thresholded_frame6, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
-      cv::erode(thresholded_frame6, thresholded_frame6, cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size(ic.morph,ic.morph)));
       
-      thresholded_frame = max(thresholded_frame1, thresholded_frame2);
-      thresholded_frame = max(thresholded_frame3, thresholded_frame);
-      thresholded_frame = max(thresholded_frame4, thresholded_frame);
-      thresholded_frame = max(thresholded_frame5, thresholded_frame);
-      thresholded_frame = max(thresholded_frame6, thresholded_frame);
+      //color processing
 
-      cv::vector<cv::vector<cv::Point> > contours;
-      cv::vector<cv::Vec4i> heirarchy;
-      cv::vector<cv::Point2i> center;
-      cv::vector<int> radius;
-      cv::findContours(thresholded_frame.clone(), contours, heirarchy, CV_RETR_TREE, CV_CHAIN_APPROX_NONE);
-      size_t count = contours.size();
-      for( int i=0; i < count; i++)
-      {
-        cv::Point2f c;
-        float r;
-        cv::minEnclosingCircle( contours[i], c, r);
+      std::vector<cv::Point2i> green_center = ic.color_filter(ic.hsv_frame, ic.green_h_min,ic.green_s_min,ic.green_v_min,
+        ic.green_h_max,ic.green_s_max,ic.green_v_max);
 
-        if ( r >= ic.minTargetRadius && r <= ic.maxTargetRadius)
-        {
-          center.push_back(c);
-          radius.push_back(r);
-        }
-      }
+      std::vector<cv::Point2i> blue_center = ic.color_filter(ic.hsv_frame, ic.blue_h_min,ic.blue_s_min,ic.blue_v_min,
+        ic.blue_h_max,ic.blue_s_max,ic.blue_v_max);
+
+      std::vector<cv::Point2i> red_center = ic.color_filter(ic.hsv_frame, ic.red_h_min,ic.red_s_min,ic.red_v_min,
+        ic.red_h_max,ic.red_s_max,ic.red_v_max);
+
+      /*std::vector<cv::Point2i> yellow_center = ic.color_filter(ic.hsv_frame, ic.yellow_h_min,ic.yellow_s_min,ic.yellow_v_min,
+        ic.yellow_h_max,ic.yellow_s_max,ic.yellow_v_max);*/
+
+      std::vector<cv::Point2i> purple_center = ic.color_filter(ic.hsv_frame, ic.purple_h_min,ic.purple_s_min,ic.purple_v_min,
+        ic.purple_h_max,ic.purple_s_max,ic.purple_v_max);
+
+      std::vector<cv::Point2i> orange_center = ic.color_filter(ic.hsv_frame, ic.orange_h_min,ic.orange_s_min,ic.orange_v_min,
+        ic.orange_h_max,ic.orange_s_max,ic.orange_v_max);
+
+      std::cerr << "-----------------" << std::endl;
+
+
+      //std::vector<vector<Point2i> > centers;
+      
+      std::cerr << "green center " << green_center << std::endl;
+      centers.push_back(green_center);
+      std::cerr << "blue_center " << blue_center << std::endl;
+      centers.push_back(blue_center);
+      std::cerr << "red_center " << red_center << std::endl;
+      centers.push_back(red_center);
+      //std::cerr << "yellow_center " << yellow_center << std::endl;
+      //centers.push_back(yellow_center);
+      std::cerr << "purple_center " << purple_center << std::endl;
+      centers.push_back(purple_center);
+      std::cerr << "orange_center " << orange_center << std::endl;
+      centers.push_back(orange_center);
+
       std_msgs::Bool object_flag;
       geometry_msgs::PointStamped object_coord;
       object_coord.header.stamp = ic.lastReading;
-      size_t counts = center.size();
-      std::cerr << "number of objects" << counts << std::endl;
-
-      // Visualisation 
+      
+      size_t counts = centers.size();
+      std::cerr << "number of objects " << counts << std::endl;
+      //std::cerr << "x and y of centers" << centers << std::endl;
       if (counts!=0)
       { 
-        cv::Scalar red(255,0,0);
-        for( int i = 0; i < counts; i++)
-        {
-          cv::circle(thresholded_frame, center[i], radius[i], red, 3);
-        }
         object_flag.data = 1;
 
-        object_coord.point.x = center[0].x;
-        object_coord.point.y = center[0].y;
+        object_coord.point.x = float(centers[0][0]);
+        //object_coord.point.y = centers[0][1];
         ic.object_coord_pub.publish(object_coord);
 
         //Publish object detected image 
@@ -328,8 +336,8 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       
       ic.object_flag_pub.publish(object_flag);
 
-      cv::imshow(OPENCV_WINDOW, thresholded_frame);
-      cv::waitKey(3);  
+      //cv::imshow(OPENCV_WINDOW, thresholded_frame);
+      //cv::waitKey(3);  
     }
 
     ros::spinOnce();

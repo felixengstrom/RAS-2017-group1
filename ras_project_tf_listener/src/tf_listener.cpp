@@ -21,11 +21,11 @@ int main(int argc, char** argv){
   ros::Subscriber sub = node.subscribe("/tf/pickup_obj", 1, chatterCallback);
   ras_project_uarm::MoveArmCartesian srv;
   tf::TransformListener listener;
-
+  tf::StampedTransform transform_arm;
+  
   ros::Rate rate(10.0);
   while (node.ok())
   {
-    tf::StampedTransform transform_arm;
     if(objectPickUp == TRUE)
     {
         try
