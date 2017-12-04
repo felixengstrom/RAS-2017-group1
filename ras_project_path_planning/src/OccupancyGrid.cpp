@@ -183,7 +183,7 @@ if(initialized==true) return true;
 }
 
 
-void OccupancyGrid::ConstructWall(const double x1, const double y1, const double x2, const double y2,int value)
+void OccupancyGrid::ConstructWall(const double x1, const double y1, const double x2, const double y2,const int value)
 {
 	//Bresenham's Line algorithm
 
