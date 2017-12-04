@@ -25,6 +25,7 @@ public:
     ros::Publisher objectCoordinateCalc_publisher;
     ros::Publisher tf_PickUp_publisher;
     ros::Publisher uarm_pickup_ack_publisher;
+    ros::Publisher objectPickedUpSuccess_publisher;
     ros::Subscriber objectDetection_subscriber;
     ros::Subscriber objectClass_subscriber;
 
@@ -45,6 +46,7 @@ public:
         engage_suction = 0;
         stopMotor_toUpdate = 0;
         sm_complete = 0;
+        obj_picked = 0;
         current_state = INITIAL_STATE;
         previous_state = OBJ_PICKUP_STATE;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
@@ -52,6 +54,7 @@ public:
         objectPosition_publisher = n.advertise<std_msgs::Float32>("/motorController/moveToObj", 1);
         arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
         objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 1);
+        objectPickedUpSuccess_publisher = n.advertise<std_msgs::Bool>("/brain/pickupSuccess", 1);
         tf_PickUp_publisher = n.advertise<std_msgs::Bool>("/tf/pickup_obj", 1);
         objectClass_subscriber = n.subscribe("/camera/object_class", 1, &CentralNode::objectClassCallback, this);
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &CentralNode::objectDetectionCallback, this);
@@ -88,7 +91,6 @@ public:
         //tf::StampedTransform transform;
         if (startPickUp == 1)
         {
-            int count = 0;
             ros::Time begin = ros::Time::now();
             switch (current_state)
             {
@@ -176,6 +178,12 @@ public:
                   {
                     ROS_INFO("Object pickup failed");
                   }
+                  else
+                  {
+                      obj_picked = 1;
+                      msg_objectPicked_custom.data = obj_picked;
+                      objectPickedUpSuccess_publisher.publish(msg_objectPicked_custom);
+                  }
                   /*while(count == 0)
                   {
                       if (1 == object_detected_current)
@@ -218,13 +226,14 @@ public:
 
 private:
     std::string classString;
-    bool object_detected_current, start_coordCalc, startPickUp;
-    bool stopMotor_toUpdate, engage_suction, pickup_object,sm_complete;
+    bool object_detected_current, start_coordCalc, startPickUp, obj_picked;
+    bool stopMotor_toUpdate, engage_suction, pickup_object, sm_complete;
     int current_state, previous_state;
     float object_x_position, diff_distance;
     std_msgs::String msg_eSpeak_string;
     std_msgs::Bool msg_tfObjCalc_bool,msg_uarm_engageSuction_bool,msg_tfPickUpObj_bool;
     std_msgs::Bool msg_motorStartStop_bool, msg_smCompleteAck_bool;
+    std_msgs::Bool msg_objectPicked_custom;
     std_msgs::Float32 msg_odomDiffDist_float;
 };
 

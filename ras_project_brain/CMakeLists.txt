@@ -14,13 +14,19 @@ add_service_files(
   PickUpObj.srv
 )
 
+add_message_files(
+  FILES
+  ObjPickup_Update.msg
+)
+
 generate_messages(
     DEPENDENCIES
     std_msgs
     geometry_msgs
 )
 
-catkin_package(CATKIN_DEPENDS roscpp rospy geometry_msgs std_msgs)
+catkin_package(CATKIN_DEPENDS roscpp rospy geometry_msgs std_msgs message_runtime)
+
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(brain_node src/firstRun_node.cpp)

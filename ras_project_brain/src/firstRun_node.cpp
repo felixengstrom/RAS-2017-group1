@@ -12,6 +12,7 @@
 #include <iostream>
 #include <math.h>
 #include <ras_project_brain/PickUpObj.h>
+#include <ras_project_brain/ObjPickup_Update.h>
 
 #define INITIAL_STATE 0
 #define OBJ_DETECTION_STATE 1
@@ -39,17 +40,19 @@ public:
     ros::Publisher objectCoordinateCalc_publisher;
     ros::Publisher robot_destination_publisher;
     ros::Publisher arm_engageSuction_publisher;
+    ros::Publisher object_pickedup_publisher;
+    ros::Publisher object_list_fileSave_publisher;
 
     ros::Publisher uarm_pickup_publisher;
     ros::Subscriber uarm_pickup_ack_subscriber;
 
-    //ros::Publisher cameraPcl_publisher;
     ros::Subscriber objectDetection_subscriber;
     ros::Subscriber objectClass_subscriber;
     ros::Subscriber objectPosition_subscriber;
     ros::Subscriber explorationCompletion_subscriber;
     ros::Subscriber robot_map_position_subscriber;
     ros::Subscriber robot_map_update_subscriber;
+    ros::Subscriber object_pickup_success_subscriber;
     tf::TransformListener listener;
     ros::ServiceClient client;
 
@@ -65,6 +68,7 @@ public:
         objectDistanceGoal_old = 200.0;
         start_coordCalc = 0;
         map_coord_updated = 0;
+        pickup_success = 0;
         //start_pcl = 0;
         slowMotor_toUpdate = 0;
         uarm_smTrigger = 0;
@@ -74,11 +78,12 @@ public:
         previous_state_exit = GOAL_REACHED;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
         motorStop_publisher = n.advertise<std_msgs::Bool>("/pathFollow/slowDown", 1);
-        //cameraPcl_publisher = n.advertise<std_msgs::Bool>("/camera/start_pcl", 1);
         exploration_command_publisher = n.advertise<std_msgs::Bool>("/Exploration/Go",1);
         objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 2);
         robot_destination_publisher = n.advertise<geometry_msgs::PoseStamped>("/robot/goal", 1);
         arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
+        object_pickedup_publisher = n.advertise<ras_project_brain::ObjPickup_Update>("/map/pickupSuccess",1);
+        object_list_fileSave_publisher = n.advertise<std_msgs::Bool>("/object/listSave",1);
 
         uarm_pickup_publisher = n.advertise<std_msgs::Bool>("/brain/smStart", 1);
         uarm_pickup_ack_subscriber = n.subscribe("/brain/smEnd", 3, &FirstRunNode::uarmSMCompleteAckCallback, this);
@@ -89,6 +94,7 @@ public:
         explorationCompletion_subscriber = n.subscribe("/Explored/done", 1, &FirstRunNode::explorationCompletionCallback, this);
         robot_map_position_subscriber = n.subscribe("/robot/pose", 1, &FirstRunNode::robotMapPositionCallback, this);
         robot_map_update_subscriber = n.subscribe("/map/coordUpdate", 1, &FirstRunNode::mapCoordUpdateCallback, this);
+        object_pickup_success_subscriber = n. subscribe("/brain/pickupSuccess", 1, &FirstRunNode::objectPickupSuccessCallback, this);
         client = n.serviceClient<ras_project_brain::PickUpObj>("obj_pickup_sm");
     }
 
@@ -132,8 +138,17 @@ public:
         sm_complete_ack = msg->data;
     }
 
+    void objectPickupSuccessCallback(const std_msgs::Bool::ConstPtr &msg)
+    {
+        pickup_success = msg->data;
+    }
+
     void pExplorationStateMachine()
     {
+        /*Slow the motors to update the position of the object/replan the path*/
+        slowMotor_toUpdate = 1;
+        msg_motorSlowDown_bool.data = slowMotor_toUpdate;
+        motorStop_publisher.publish(msg_motorSlowDown_bool);
 
         if (ros::Time::now()- begin <= ros::Duration(30.0) && exploration_completion!=1 )
         {
@@ -157,14 +172,6 @@ public:
                     objectDetection_publisher.publish(msg_eSpeak_string);
                     msg_eSpeak_string.data = classString;
                     objectDetection_publisher.publish(msg_eSpeak_string);
-                    /*Start the PCL functionality of the camera */
-                    /*start_pcl = 1;
-                    msg_cameraPcl_startStop_bool.data = start_pcl;
-                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/
-                    /*Slow the motors to update the position of the object/replan the path*/
-                    slowMotor_toUpdate = 1;
-                    msg_motorSlowDown_bool.data = slowMotor_toUpdate;
-                    motorStop_publisher.publish(msg_motorSlowDown_bool);
                     /*Start the calculation of object coordinates wrt robot*/
                     start_coordCalc = 1;
                     msg_tfObjCalc_bool.data = start_coordCalc;
@@ -187,14 +194,6 @@ public:
                     ROS_INFO("Position found: x=%.2f, y=%.2f", list[i].location.x,list[i].location.y);
                     j = 0;
                     i += 1;
-                    /*Stop the PCL functionality of the camera */
-                    /*start_pcl = 0;
-                    msg_cameraPcl_startStop_bool.data = start_pcl;
-                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/
-                    /*Continue motors to run normally*/
-                    slowMotor_toUpdate = 0;
-                    msg_motorSlowDown_bool.data = slowMotor_toUpdate;
-                    motorStop_publisher.publish(msg_motorSlowDown_bool);
                     /*Stop the calculation of object coordinates wrt robot*/
                     start_coordCalc = 0;
                     msg_tfObjCalc_bool.data = start_coordCalc;
@@ -267,6 +266,17 @@ public:
                     {
                         current_state_exit = PICKUP_OBJECT;
                     }
+                    else
+                    {
+                        if(1 == pickup_success)
+                        {
+                            msg_pickup_update_custom.coord.x = list[item_num].location.x;
+                            msg_pickup_update_custom.coord.y = list[item_num].location.y;
+                            msg_pickup_update_custom.coord.z = list[item_num].location.z;
+                            msg_pickup_update_custom.pickedUp = 1;
+                            object_pickedup_publisher.publish(msg_pickup_update_custom);
+                        }
+                    }
                     /*srv.request.objPickUpState = 1;
                     if (client.call(srv))
                     {
@@ -276,7 +286,6 @@ public:
                     {
                     	ROS_INFO("Warning: Pickup call failed!!");
                     }*/
-                    /*Stop uarm SM*/
                 break;
                 case GOTO_GOAL:
                     ROS_INFO("Sent the goal position");
@@ -291,6 +300,9 @@ public:
                     msg_robotDestination.pose.position.y = 0.0;
                     msg_robotDestination.pose.position.z = 0.0;
                     robot_destination_publisher.publish(msg_robotDestination);
+                    /*reset the map update*/
+                    msg_pickup_update_custom.pickedUp = 0;
+                    object_pickedup_publisher.publish(msg_pickup_update_custom);
                 break;
                 case GOAL_REACHED:
                     ROS_INFO("Going to the goal position");
@@ -309,6 +321,9 @@ public:
                     engage_suction = 0;
                     msg_uarm_engageSuction_bool.data = engage_suction;
                     arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
+                    /*Request to save the object list in fa file*/
+                    msg_objectFileSave_bool.data = 1;
+                    object_list_fileSave_publisher.publish(msg_objectFileSave_bool);
                 break;
                 default:
                     ROS_INFO("Task over");
@@ -320,7 +335,7 @@ private:
     std::string classString;
     bool object_detected_current, start_coordCalc, start_pcl, object_detected_prev, map_coord_updated;
     bool slowMotor_toUpdate, exploration_start_stop, pickup_object,exploration_completion;
-    bool uarm_smTrigger, sm_complete_ack, engage_suction;
+    bool uarm_smTrigger, sm_complete_ack, engage_suction, pickup_success;
     int current_state, previous_state;
     int current_state_exit, previous_state_exit;
     int item_num;
@@ -330,6 +345,8 @@ private:
     geometry_msgs::Point robotPosition;
     std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool,msg_cameraPcl_startStop_bool;
     std_msgs::Bool msg_motorSlowDown_bool, msg_uarm_pickup_bool, msg_uarm_engageSuction_bool;
+    std_msgs::Bool msg_objectFileSave_bool;
+    ras_project_brain::ObjPickup_Update msg_pickup_update_custom;
     std_msgs::Float32 msg_odomDiffDist_float;
     ros::Time begin;
     object_details list[10];
