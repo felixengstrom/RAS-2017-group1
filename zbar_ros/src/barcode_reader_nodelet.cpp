@@ -82,12 +82,12 @@ namespace zbar_ros
     zbar::Image zbar_image(cv_image->image.cols, cv_image->image.rows, "Y800", cv_image->image.data,
         cv_image->image.cols * cv_image->image.rows);
     scanner_.scan(zbar_image);
-
+    std::string barcode = "no trap"
     // iterate over all barcode readings from image
     for (zbar::Image::SymbolIterator symbol = zbar_image.symbol_begin();
          symbol != zbar_image.symbol_end(); ++symbol)
     {
-      std::string barcode = symbol->get_data();
+      barcode = symbol->get_data();//std::string barcode = symbol->get_data();
       // verify if repeated barcode throttling is enabled
       if (throttle_ > 0.0)
       {

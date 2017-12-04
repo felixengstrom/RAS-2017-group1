@@ -29,6 +29,7 @@ class OccupancyGrid
 		ros::Publisher OG_pub; //the OccupancyGrid publisher
 		ros::Subscriber wall_sub; // the subscriber that add wall to the existing Occupancy grid
 		ros::Subscriber object_sub;// The subscriber that add obstacle (and object)?
+		ros::Subscriber wall_remov_sub;
 		//OccupancyGrid Data
 		//----------------------//
 		std::string _map_file; // Name of Map file
@@ -52,7 +53,8 @@ class OccupancyGrid
 		bool Map_initialize();
 		void WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
 		void ObjectCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg);
-		void ConstructWall(const double x1, const double y1, const double x2, const double y2);
+		void ConstructWall(const double x1, const double y1, const double x2, const double y2, int value);
+		void RemoveWallCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
 	public:
 		OccupancyGrid() : initialized(false), _map_OG("/maze_OccupancyGrid"),n("~")
 		{
@@ -65,12 +67,29 @@ class OccupancyGrid
     		OG_pub= n.advertise<nav_msgs::OccupancyGrid>( _map_OG,0);
 		wall_sub = n.subscribe("/wall_add",10,&OccupancyGrid::WallCallback,this);
 		object_sub = n.subscribe("/object_add",10,&OccupancyGrid::ObjectCallback,this);
+		wall_remov_sub = n.subscribe("/wall_removve",10,&OccupancyGrid::RemoveWallCallback,this);
 		}
 		
 		void loop_function();
 
 
 };
+void OccupancyGrid::RemoveWallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
+{
+
+	geometry_msgs::Pose adp; //add points
+	double x1,y1,x2,y2;
+	if(msg->poses.size()==2)
+	{
+		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y,0);
+		
+		stamp = ros::Time::now();
+    		map_load_time= ros::Time::now(); // Time() before
+	}
+	else ROS_INFO_STREAM("Wall Message recieved should be Two points!");
+
+}
+
 bool OccupancyGrid::Map_initialize()
 {
 if(initialized==true) return true;
@@ -155,7 +174,7 @@ if(initialized==true) return true;
         }
         // angle and distance
 		
-    	ConstructWall(x1,y1,x2,y2);
+    	ConstructWall(x1,y1,x2,y2,100);
     
     
     }
@@ -164,7 +183,7 @@ if(initialized==true) return true;
 }
 
 
-void OccupancyGrid::ConstructWall(const double x1, const double y1, const double x2, const double y2)
+void OccupancyGrid::ConstructWall(const double x1, const double y1, const double x2, const double y2,int value)
 {
 	//Bresenham's Line algorithm
 
@@ -200,7 +219,8 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(_width*Y+X <data.size())
 			{
-			data[_width*Y+X]=(int8_t)100;
+				if(data[_width*Y+X]!=100)
+					data[_width*Y+X]=(int8_t)value;
 			}
 			Y=Y+step;
 			
@@ -213,7 +233,8 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(_width*Y+X <data.size())
 			{
-			data[_width*Y+X]=(int8_t)100;
+				if(data[_width*Y+X]!=100)
+					data[_width*Y+X]=(int8_t)value;
 			}
 			X=X+1;
 		}	
@@ -227,7 +248,8 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(_width*Y+X <data.size())
 			{
-			data[_width*Y+X]=(int8_t)100;
+				if(data[_width*Y+X]!=100)
+				data[_width*Y+X]=(int8_t)value;
 			}
 			Y=Y+step;
 			p=p+B;
@@ -235,8 +257,10 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		else
 		{
 			if(_width*Y+X <data.size())
-			data[_width*Y+X]=(signed char)100;
-			
+			{
+				if(data[_width*Y+X]!=100)
+					data[_width*Y+X]=(int8_t)value;
+			}
 			p=p+A;
 		}
 		X=X+1;
@@ -255,16 +279,20 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 			if(p>=0)
 			{
 				if(_width*Y+X <data.size())
-				data[_width*Y+X]=(int8_t)100;
-				
+				{
+					if(data[_width*Y+X]!=100)
+					data[_width*Y+X]=(int8_t)value;
+				}
 				X=X+1;
 				p=p+B;
 			}
 			else
 			{
 				if(_width*Y+X <data.size())
-				data[_width*Y+X]=(signed char)100;
-				
+				{
+					if(data[_width*Y+X]!=100)
+					data[_width*Y+X]=(int8_t)value;
+				}
 				p=p+A;
 			}
 			Y=Y+step;
@@ -277,7 +305,7 @@ void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 	double x1,y1,x2,y2;
 	if(msg->poses.size()==2)
 	{
-		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y);
+		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y, 50);
 		
 		stamp = ros::Time::now();
     		map_load_time= ros::Time::now(); // Time() before

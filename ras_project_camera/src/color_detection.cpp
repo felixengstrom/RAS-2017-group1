@@ -43,7 +43,7 @@ public:
   {
     image_sub_ = it_.subscribe("/camera/rgb/image_raw", 1, &ImageConverter::ImageCb, this);
     image_pub_ = it_.advertise("/camera/thresholded_image", 1);
-    detection_sub = nh_.subscribe("/camera/detection", 1, &ImageConverter::DetectionCb, this);
+    //detection_sub = nh_.subscribe("/camera/detection", 1, &ImageConverter::DetectionCb, this);
     object_coord_pub = nh_.advertise<geometry_msgs::Point>("/camera/object_coord",1);
     object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/object_detected",1);
 
@@ -148,6 +148,12 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
     {
       static int image_count = 0;
       //Image processing
+      
+      /*// save images                               
+      std::stringstream sstream;                               
+      sstream << "object" << image_count << ".jpg" ;                  
+      ROS_ASSERT( cv::imwrite( sstream.str(), ic.cv_ptr->image) );      
+      image_count++;*/
 
       cv::Scalar green_min(ic.green_h_min,ic.green_s_min,ic.green_v_min);
       cv::Scalar green_max(ic.green_h_max,ic.green_s_max,ic.green_v_max);
@@ -279,12 +285,12 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       object_coord.x = center[0].x;
       object_coord.y = center[0].y;
       
-      // save images                               
+      /*// save images                               
       std::stringstream sstream;                               
       sstream << "object" << image_count << ".jpg" ;                  
       ROS_ASSERT( cv::imwrite( sstream.str(), ic.cv_ptr->image) );      
       image_count++;
-      std::cerr << "im " << image_count << std::endl;
+      std::cerr << "im " << image_count << std::endl;*/
       }
 
       else
@@ -303,7 +309,7 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       ic.image_pub_.publish(out_msg.toImageMsg());
 
      // cv::imshow(OPENCV_WINDOW, thresholded_frame);
-      //cv::waitKey(3);
+     // cv::waitKey(3);
       
     }
 

@@ -25,7 +25,7 @@
 struct object_details
 {
     geometry_msgs::Point location;
-    std::string colour_type[3];
+    std::string colour_type[5];
 };
 
 class FirstRunNode
@@ -72,7 +72,7 @@ public:
         objectClass_subscriber = n.subscribe("/camera/object_class", 1, &FirstRunNode::objectClassCallback, this);
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &FirstRunNode::objectDetectionCallback, this);
         objectPosition_subscriber = n.subscribe("/map/objectCoord", 1, &FirstRunNode::objectPositionCallback, this);
-        explorationCompletion_subscriber = n.subscribe("/Explored/Done", 1, &FirstRunNode::explorationCompletionCallback, this);
+        explorationCompletion_subscriber = n.subscribe("/Explored/done", 1, &FirstRunNode::explorationCompletionCallback, this);
         robot_map_position_subscriber = n.subscribe("/robot/pose", 1, &FirstRunNode::robotMapPositionCallback, this);
     }
 
@@ -109,7 +109,7 @@ public:
     void pExplorationStateMachine()
     {
 
-        if (ros::Time::now()- begin <= ros::Duration(60.0*3) && exploration_completion!=1 )
+        if (ros::Time::now()- begin <= ros::Duration(60.0) && exploration_completion!=1 )
         {
             ROS_INFO("In state exploration");
             //continue exploration
