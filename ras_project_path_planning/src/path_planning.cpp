@@ -43,7 +43,8 @@ class PathPlanning
 		ros::Publisher C_pub;
 		ros::Publisher Path_pub; // publish set of points for rviz
 		ros::Publisher Path_follower_pub; //publish for pathfollower
-		ros::Publisher Follower_stop_pub;
+		ros::Publisher Follower_stop_pub; //Publish to Follower to stop, used while replanning path
+		ros::Publisher Path_unreachable_pub; //Publish unreachable message when point unreachable
 		tf::TransformListener listener;
 		//for updating only when dif
 		ros::Time t_update; // For OG callback
@@ -92,6 +93,7 @@ class PathPlanning
 			Path_pub = n.advertise<visualization_msgs::Marker>("Path_plan_marker",0);
 			Path_follower_pub = n.advertise<geometry_msgs::PoseArray>("/pose_teleop",0);
 			Follower_stop_pub = n.advertise<std_msgs::Bool>("/robot/stop",0);
+			Path_unreachable_pub = n.advertise<std_msgs::Bool>("/path/unreachable",0);
 		}	
 		double checkwall(const int index_now);
    		double  heuristic(const point& p1, const point& p2);
@@ -203,10 +205,12 @@ if(initialized == false) return; // suspend loop until the OccupancyGrid is load
 
 if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 	if(path_list.size()==0){
-	std_msgs::Bool followerstop;
-	followerstop.data = true;
-	Follower_stop_pub.publish(followerstop);
-	Path(x_start,y_start,x_goal,y_goal);
+		//Ask Path_following to stop while computing new path
+		std_msgs::Bool followerstop;
+		followerstop.data = true;
+		Follower_stop_pub.publish(followerstop);
+		//--------------------------------------//
+		Path(x_start,y_start,x_goal,y_goal);
 	}
 
 	if(path_list.size()>0){
@@ -302,7 +306,7 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 		if((int)OG[i]!=0)//thicken points/wall
 			{
 				Csp[i]=100;
-				//ROS_INFO_STREAM("for i = " << i << " we have Csp " << (int)Csp[i]<< " cell " << cells );
+				//Csp[i]=(int)OG[i]; //if Csp also 0 - 100 range
 				for(y=0;y<=cells;y++)
 				{
 					for(x=0;x<=cells; x++)
@@ -350,9 +354,8 @@ void PathPlanning::Path(double x0, double y0, double x1, double y1)
 {
 
 //A*
-double rt2 = sqrt(2);
-//int x,y; //Goal pos in meter
-//int x0,y0; // Current Robot position from Odometry
+//double  x1,y1; //Goal pos in meter
+//double x0,y0; // Current Robot position in meter
 int x_cell = (int)(x1/_res);
 int y_cell = (int)(y1/_res);
 
@@ -362,7 +365,7 @@ if(x_cell+y_cell*_width < Csp.size() && x_cell+y_cell*_width >=0)
 {
 if(Csp[x_cell+y_cell*_width]!=0)
 {
-	ROS_INFO_STREAM("thats a wall");
+	ROS_INFO_STREAM("Goal position specified is in a wall, computing closest available point......");
 int step = 1;
 bool loop=true; bool done = false;
 while(loop)
@@ -372,7 +375,7 @@ while(loop)
 	if(done) continue;
 		for(int j = -step; j<=step; j++)
 		{
-			
+			if(done) continue;
 				 if(x_cell+j+(y_cell+i)*_width < Csp.size() && x_cell+j+(y_cell+i)*_width >=0)
 				 {
 					if(Csp[x_cell+j+(y_cell+i)*_width]==0)
@@ -397,10 +400,10 @@ while(loop)
 	}
 	step++;
 	if(step>100)
-	{return; ROS_INFO_STREAM("No goal point found in  " << step << " steps");}
+	{return; ROS_INFO_STREAM("No open goal point found in  " << step << " steps around the original point");}
 }
 }}
-else { ROS_INFO_STREAM(" given goal outside maze");return;}
+else { ROS_INFO_STREAM(" given goal outside maze grid");return;}
 
 if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 {
@@ -408,6 +411,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 	if(Csp[x_Start + y_Start*_width]!=0)
 	{
 		bool loop=true; bool done = false;
+		ROS_INFO_STREAM("start position specified is in a  wall, computing closest available point......");
 		while(loop)
 		{
 			for(int i = -step; i <= step; i+=2*step)
@@ -415,6 +419,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 			if(done) continue;
 				for(int j=-step; j<=step; j++)
 				{
+				if(done) continue;
 				 if(x_Start+j+(y_Start+i)*_width < Csp.size() && x_Start+j+(y_Start+i)*_width >=0)
 				 {
 					if(Csp[x_Start+j+(y_Start+i)*_width]==0)
@@ -450,7 +455,7 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 	}
 
 }
-else{ROS_INFO_STREAM("Start Position outside maze"); return;}
+else{ROS_INFO_STREAM("Start Position outside maze grid"); return;}
 //Reset values
 path_list.clear();
 cameFrom.clear();
@@ -524,10 +529,16 @@ while(openSet.size()!=0 && no_path)
 	}		
 	//ROS_INFO_STREAM("A* iteration: " << amount << " size of openSet: " << openSet.size()<< "  D = " << D );
 if(closeSet.size() <=closed_size)
-{ ROS_INFO_STREAM("Given goal unreachable by pathplanning"); Wall_step = std::max(0,Wall_step-1); return;}	
+{ 	ROS_INFO_STREAM("Given goal unreachable by pathplanning"); Wall_step = std::max(0,Wall_step-1);
+	std_msgs::Bool notreachable; notreachable.data = false;
+	Path_unreachable_pub.publish(notreachable);       	
+	return;
+}	
 closed_size=closeSet.size();
 }
-
+ROS_INFO_STREAM("Given goal is unreachable by pathplanning, publishing false to topic");
+std_msgs::Bool notreachable; notreachable.data = false;
+Path_unreachable_pub.publish(notreachable);       	
 return;
 }
 
