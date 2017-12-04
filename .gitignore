@@ -8,3 +8,5 @@ ras_project_camera/src/VGG1*
 *.zip
 *.bag
 *.h5
+
+*/lab_maze_2017_new.txt

@@ -205,6 +205,7 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
     }
     for ( int i = 0; i < nParticles; i++)
     {
+        double alpha = particles.channels[i].values[0] + atan2(transform.getOrigin().y(),transform.getOrigin().x());
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
         double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)*ang_noise_f) + ang_noise(rng)*ang_noise_f;
@@ -212,8 +213,8 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
         //omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
-        particles.points[i].x += cos(omega_n)*vt + vt*(float)vel_noise(rng)*cos(omega_n)*lin_noise_f;
-        particles.points[i].y += sin(omega_n)*vt + vt*(float)vel_noise(rng)*sin(omega_n)*lin_noise_f;
+        particles.points[i].x += cos(alpha)*vt + vt*(float)vel_noise(rng)*cos(alpha)*lin_noise_f;
+        particles.points[i].y += sin(alpha)*vt + vt*(float)vel_noise(rng)*sin(alpha)*lin_noise_f;
     }
 }
 
