@@ -134,6 +134,11 @@ public:
 
     void pExplorationStateMachine()
     {
+        
+        /*Slow the motors to update the position of the object/replan the path*/
+        slowMotor_toUpdate = 1;
+        msg_motorSlowDown_bool.data = slowMotor_toUpdate;
+        motorStop_publisher.publish(msg_motorSlowDown_bool);
 
         if (ros::Time::now()- begin <= ros::Duration(30.0) && exploration_completion!=1 )
         {
@@ -160,11 +165,7 @@ public:
                     /*Start the PCL functionality of the camera */
                     /*start_pcl = 1;
                     msg_cameraPcl_startStop_bool.data = start_pcl;
-                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/
-                    /*Slow the motors to update the position of the object/replan the path*/
-                    slowMotor_toUpdate = 1;
-                    msg_motorSlowDown_bool.data = slowMotor_toUpdate;
-                    motorStop_publisher.publish(msg_motorSlowDown_bool);
+                    cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/ 
                     /*Start the calculation of object coordinates wrt robot*/
                     start_coordCalc = 1;
                     msg_tfObjCalc_bool.data = start_coordCalc;
@@ -192,9 +193,9 @@ public:
                     msg_cameraPcl_startStop_bool.data = start_pcl;
                     cameraPcl_publisher.publish(msg_cameraPcl_startStop_bool);*/
                     /*Continue motors to run normally*/
-                    slowMotor_toUpdate = 0;
-                    msg_motorSlowDown_bool.data = slowMotor_toUpdate;
-                    motorStop_publisher.publish(msg_motorSlowDown_bool);
+                    //slowMotor_toUpdate = 0;
+                    //msg_motorSlowDown_bool.data = slowMotor_toUpdate;
+                    //motorStop_publisher.publish(msg_motorSlowDown_bool);
                     /*Stop the calculation of object coordinates wrt robot*/
                     start_coordCalc = 0;
                     msg_tfObjCalc_bool.data = start_coordCalc;

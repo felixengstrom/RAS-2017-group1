@@ -3,6 +3,9 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <ras_msgs/RAS_Evidence.h>
+#include <ras_project_camera/StringStamped.h>
 #include <tf/transform_datatypes.h>
 #include <math.h>
 #include <std_msgs/Bool.h>
@@ -10,47 +13,271 @@ class ObjectAddition
 {
 	private:
 		ros::NodeHandle n;
-		//ros::Publisher motor_pub;
-		ros::Subscriber position_sub;
+		ros::Subscriber object_position_sub;
+		ros::Subscriber trap_position_sub;
+		ros::Subscriber battery_position_sub;
 		ros::Subscriber classification_sub;
-		geometry_msgs::PointStamped object_point;
-		int object_classification;
-		std::list<std::array<float,3>> classified_objects;
-		char* filename;
+		ros::Subscriber image_sub;
+		ros::Publisher evidence_pub;
+		ros::Publisher occupgrid_pub;
+		ros::Time last_position_stamp;
+		std::list<ras_msgs::RAS_Evidence> waiting_objects;
+		std::list<float[4]> classified_objects;
+		std::string filename;
 
 	public:
 	ObjectAddition()
 	{
 		n = ros::NodeHandle();
-    		position_sub = n.subscribe("/map/objectCoord", 10, &ObjectAddition::positionCallback,this);
-    		classification_sub = n.subscribe("/camera/object_class", 10, &ObjectAddition::classificationCallback,this);
-		object_point = NULL;
-		object_classification = 0;
-		classified_objects = NULL;
+    		object_position_sub = n.subscribe("/map/objectCoord", 10, &ObjectAddition::objectPositionCallback,this);
+		trap_position_sub = n.subscribe("/map/trapCoord", 10, &ObjectAddition::trapPositionCallback, this);
+		battery_position_sub = n.subscribe("/map/batteryCoord", 10, &ObjectAddition::batteryPositionCallback, this);
+    		classification_sub = n.subscribe("/camera/object_class", 10, &ObjectAddition::classificationCallback, this);
+		image_sub = n.subscribe("/camera/object_detected_image", 10, &ObjectAddition::imageCallback, this);
+		evidence_pub = n.advertise<ras_msgs::RAS_Evidence>("/evidence", 1);
+		occupgrid_pub = n.advertise<geometry_msgs::PoseStamped>("/object_add", 1);
 		filename = "classified_objects.txt";
 	}
-		void positionCallback(const geometry_msgs::PointStamped::ConstPtr& msg);
-		void classificationCallback(const std_msgs::String::ConstPtr& msg);
+		void objectPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg);
+		void trapPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg);
+		void batteryPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg);
+		void classificationCallback(const ras_project_camera::StringStamped::ConstPtr& msg);
+		void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 		void object_add(void);
 		int classification_string_to_int(char* classification);
 		float classification_to_radius(int classification);
 };
 
-void ObjectAddition::positionCallback(const geometry_msgs::PointStamped::ConstPtr& msg) {
-	object_point = *msg;
-	if (object_classification != 0)
-	    this.object_add();
+void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg) {
+	ros::Time timestamp = msg->header.stamp;
+	std::list<ras_msgs::RAS_Evidence>::iterator it;
+	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
+	{
+		if (timestamp == it->stamp)
+			break;
+	}
+	for (std::list<float[4]>::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	{
+		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]) && std::abs(msg->transform.translation.z - (*it_bis)[2]) < 0.02)
+		{
+			if (it != waiting_objects.end())
+			{
+				delete(&(*it));
+				waiting_objects.erase(it);
+			}
+			return;
+		}
+	}
+	if (it == waiting_objects.end())
+	{
+		ras_msgs::RAS_Evidence object;
+		object.stamp = timestamp;
+		object.object_location = *msg; // May not work, need maybe to clone instead
+		object.group_number = 1;
+		waiting_objects.push_back(object);
+	}
+	else
+	{
+		while (timestamp != waiting_objects.front().stamp)
+		{
+			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
+			waiting_objects.erase(waiting_objects.begin());
+		}
+		waiting_objects.front().object_location = *msg;
+		if (waiting_objects.front().image_evidence && waiting_objects.front().object_id)
+		{
+			evidence_pub.publish(waiting_objects.front());
+			float object[] = new float[4];
+			object[0] = waiting_objects.front().object_location.transform.translation.x;
+			object[1] = waiting_objects.front().object_location.transform.translation.y;
+			object[2] = waiting_objects.front().object_location.transform.translation.z;
+			object[3] = classification_string_to_int(waiting_objects.front().object_id);
+			classified_objects.push_back(object);
+			delete(&waiting_objects.front());
+			waiting_objects.erase(waiting_objects.begin());
+			geometry_msgs::PoseStamped object_map;
+			object_map.header.stamp = ros::Time::now();
+			object_map.pose.position.x = object[0];
+			object_map.pose.position.y = object[1];
+			object_map.pose.position.z = 1;
+			occupgrid_pub.publish(object_map);
+		}
+	}
 	return;
 }
 
-void ObjectAddition::classificationCallback (const std_msgs::String::ConstPtr& msg) {
-	object_classification = classification_string_to_int(msg->data);
-	if (object_point != NULL)
-	    this.object_add();
+void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg) {
+	ros::Time timestamp = msg->header.stamp;
+	std::list<ras_msgs::RAS_Evidence>::iterator it;
+	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
+	{
+		if (timestamp == it->stamp)
+			break;
+	}
+	for (std::list<float[4]>::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	{
+		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]))
+		{
+			if (it != waiting_objects.end())
+			{
+				delete(&(*it));
+				waiting_objects.erase(it);
+			}
+			return;
+		}
+	}
+	if (it != waiting_objects.end())
+	{
+		delete(&(*it));
+		waiting_objects.erase(it);
+	}
+	float object[] = new float[4];
+	object[0] = msg->transform.translation.x;
+	object[1] = msg->transform.translation.y;
+	object[2] = msg->transform.translation.z;
+	object[3] = 18.0;
+	classified_objects.push_back(object);
+	geometry_msgs::PoseStamped object_map;
+	object_map.header.stamp = ros::Time::now();
+	object_map.pose.position.x = object[0];
+	object_map.pose.position.y = object[1];
+	object_map.pose.position.z = 2;
+	occupgrid_pub.publish(object_map);
 	return;
 }
 
-int classification_string_to_int(char* classification)
+void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg) {
+	ros::Time timestamp = msg->header.stamp;
+	std::list<ras_msgs::RAS_Evidence>::iterator it;
+	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
+	{
+		if (timestamp == it->stamp)
+			break;
+	}
+	for (std::list<float[4]>::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	{
+		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]) && std::abs(msg->transform.translation.z - (*it_bis)[2]) < 0.02)
+		{
+			if (it != waiting_objects.end())
+			{
+				delete(&(*it));
+				waiting_objects.erase(it);
+			}
+			return;
+		}
+	}
+	if (it != waiting_objects.end())
+	{
+		delete(&(*it));
+		waiting_objects.erase(it);
+	}
+	float object[] = new float[4];
+	object[0] = msg->transform.translation.x;
+	object[1] = msg->transform.translation.y;
+	object[2] = msg->transform.translation.z;
+	object[3] = 17.0;
+	classified_objects.push_back(object);
+	geometry_msgs::PoseStamped object_map;
+	object_map.header.stamp = ros::Time::now();
+	object_map.pose.position.x = object[0];
+	object_map.pose.position.y = object[1];
+	object_map.pose.position.z = 3;
+	occupgrid_pub.publish(object_map);
+	return;
+}
+
+void ObjectAddition::classificationCallback (const std_msgs::StringStamped::ConstPtr& msg) {
+	ros::Time timestamp = msg->header.stamp;
+	std::list<ras_msgs::RAS_Evidence>::iterator it;
+	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
+	{
+		if (timestamp == it->stamp)
+			break;
+	}
+	if (it == waiting_objects.end())
+	{
+		ras_msgs::RAS_Evidence object;
+		object.stamp = timestamp;
+		object.object_id = msg->data; // May not work, need maybe to clone instead
+		object.group_number = 1;
+		waiting_objects.push_back(object);
+	}
+	else
+	{
+		while (timestamp != waiting_objects.front().stamp)
+		{
+			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
+			waiting_objects.erase(waiting_objects.begin());
+		}
+		waiting_objects.front().object_id = msg->data;
+		if (waiting_objects.front().image_evidence && waiting_objects.front().object_location)
+		{
+			evidence_pub.publish(waiting_objects.front());
+			float object[] = new float[4];
+			object[0] = waiting_objects.front().object_location.transform.translation.x;
+			object[1] = waiting_objects.front().object_location.transform.translation.y;
+			object[2] = waiting_objects.front().object_location.transform.translation.z;
+			object[3] = classification_string_to_int(waiting_objects.front().object_id);
+			classified_objects.push_back(object);
+			delete(&waiting_objects.front());
+			waiting_objects.erase(waiting_objects.begin());
+			geometry_msgs::PoseStamped object_map;
+			object_map.header.stamp = ros::Time::now();
+			object_map.pose.position.x = object[0];
+			object_map.pose.position.y = object[1];
+			object_map.pose.position.z = 1;
+			occupgrid_pub.publish(object_map);
+		}
+	}
+	return;
+}
+
+void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
+	std::list<ras_msgs::RAS_Evidence>::iterator it;
+	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
+	{
+		if (timestamp == it->stamp)
+			break;
+	}
+	if (it == waiting_objects.end())
+	{
+		ras_msgs::RAS_Evidence object;
+		object.stamp = timestamp;
+		object.image_evidence = *msg; // May not work, need maybe to clone instead
+		object.group_number = 1;
+		waiting_objects.push_back(object);
+	}
+	else
+	{
+		while (timestamp != waiting_objects.front.stamp)
+		{
+			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
+			waiting_objects.erase(waiting_objects.begin());
+		}
+		waiting_objects.front.image_evidence = *msg;
+		if (waiting_objects.front().image_evidence && waiting_objects.front().object_location)
+		{
+			evidence_pub.publish(waiting_objects.front());
+			float object[] = new float[4];
+			object[0] = waiting_objects.front().object_location.transform.translation.x;
+			object[1] = waiting_objects.front().object_location.transform.translation.y;
+			object[2] = waiting_objects.front().object_location.transform.translation.z;
+			object[3] = classification_string_to_int(waiting_objects.front().object_id);
+			classified_objects.push_back(object);
+			delete(&waiting_objects.front());
+			waiting_objects.erase(waiting_objects.begin());
+			geometry_msgs::PoseStamped object_map;
+			object_map.header.stamp = ros::Time::now();
+			object_map.pose.position.x = object[0];
+			object_map.pose.position.y = object[1];
+			object_map.pose.position.z = 1;
+			occupgrid_pub.publish(object_map);
+		}
+	}
+	return;
+}
+
+int ObjectAddition::classification_string_to_int(char* classification)
 {
 	if (classification == "An object")
 		return 1;
@@ -92,7 +319,7 @@ int classification_string_to_int(char* classification)
 		return 0;
 }
 
-float classification_to_radius(int classification)
+float ObjectAddition::classification_to_radius(int classification)
 {
 	switch(classification)
 	{
@@ -117,194 +344,17 @@ float classification_to_radius(int classification)
 		case 15:
 		case 16:
 			return 0.05/2.0;
+		case 17:
+			return 0.15/2.0;
+		case 18:
+			return 0.1/2.0;
 		default:
 			return 0.0;
 	}
 }
 
-void object_add(void)
-{
-	float object_radius = classification_to_radius(object_classification);
-	bool new_object = true;
-	for (const std::array<float, 3>& object : classified_objects)
-	{
-		float distance = std::sqrt(std::pow(object[0] - object_position.point.x,2)+std::pow(object[1] - object_position.point.y,2));
-		if (object_radius + classification_to_radius(object[2]) > distance)
-		{
-			new_object = false;
-			break;
-		}
-	}
-	if (new_object)
-	{
-		std::array<float, 3> object;
-		object[0] = object_position.point.x;
-		object[1] = object_position.point.y;
-		object[2] = (float) object_classification;
-		classified_objects.push_back(object);
-		add_to_file(object);
-		add_to_map(object);
-	}
-}
-
-void add_to_file(std::array<float, 3> object)
-{
-
-}
-
-void add_to_map(std::array<float, 3> object)
-{
-	float deg_to_rad = std::acos(-1)/180.0;
-	for (float i = 0.0; i < 360.0; i += 30.0)
-	{
-		
-	}
-}
-
-void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr& msg) {
-   if(stop)
-   {
-	geometry_msgs::Twist move;
-	move.linear.x = 0;
-	move.angular.z = 0;
-	motor_pub.publish(move);
-	return;
-   }
-   // should one add at least 0 velocity publish here?
-   geometry_msgs::PoseStamped robot_pose = *msg;
-   geometry_msgs::Twist move;
-   float y_current = robot_pose.pose.position.y;
-   float x_current = robot_pose.pose.position.x;
-   //double final_pose= poses.poses[current_pose].orientation.z; // Z NOT QUATERINO, ITS YAW
-   //double theta = atan2(y_desired-y_current, x_desired-x_current);
-   float PI = std::acos(-1);
-   double roll,pitch,yaw;
-   tf::Quaternion q(robot_pose.pose.orientation.x, robot_pose.pose.orientation.y, robot_pose.pose.orientation.z ,robot_pose.pose.orientation.w);
-   tf::Matrix3x3 m(q);
-   m.getRPY(roll,pitch,yaw);
-   double theta_current =yaw;
-   if (first)
-   {
-	float angle_first_line = std::atan2(vectors[0][1], vectors[0][0]);
-	float angle_difference = theta_current - angle_first_line;
-	if (angle_difference > 0.2)
-	{
-	    geometry_msgs::Twist move;
-	    move.linear.x = 0;
-	    move.angular.z = -0.6;
-	    motor_pub.publish(move);
-	    return;
-	}
-	else if (angle_difference < -0.2)
-	{
-	    geometry_msgs::Twist move;
-	    move.linear.x = 0;
-	    move.angular.z = 0.6;
-	    motor_pub.publish(move);
-	    return;
-	}
-	else
-	    first = false;
-   }
-   // Determine closest point to the path
-   float smallest_distance = -1;
-   float distance_line;
-   for (int i = 0; i < nb_poses - 1; i++)
-   {
-	float segment_length = std::sqrt(std::pow(poses.poses[i+1].position.x-poses.poses[i].position.x,2)+std::pow(poses.poses[i+1].position.y-poses.poses[i].position.y,2));
-	float projection_length = (x_current - poses.poses[i].position.x)*vectors[i][0] + (y_current - poses.poses[i].position.y)*vectors[i][1];
-        projection_length = std::max(0.0f, std::min(segment_length, projection_length));
-	float projection[2] = {poses.poses[i].position.x + projection_length*vectors[i][0], poses.poses[i].position.y + projection_length*vectors[i][1]};
-	float distance = std::sqrt(std::pow(x_current - projection[0],2)+std::pow(y_current - projection[1], 2));
-	if (distance < smallest_distance || smallest_distance == -1)
-	{
-	    smallest_distance = distance;
-	    closest_line = i;
-	    distance_line = projection_length;
-	}
-   }
-   float closest_point[2];
-   closest_point[0] = poses.poses[closest_line].position.x + distance_line*vectors[closest_line][0];
-   closest_point[1] = poses.poses[closest_line].position.y + distance_line*vectors[closest_line][1];
-   // Find goal point which is a distance D away from closest_point on path
-   float goal_point[2];
-   int i;
-   for (i = closest_line; i < nb_poses-1; i++)
-   {
-        float a = std::pow(vectors[i][0],2) + std::pow(vectors[i][1],2);
-        float b = 2.0*vectors[i][0]*(poses.poses[i].position.x - closest_point[0]) + 2.0*vectors[i][1]*(poses.poses[i].position.y - closest_point[1]);
-        float c = std::pow(poses.poses[i].position.y-closest_point[1],2) + std::pow(poses.poses[i].position.x-closest_point[0],2) - std::pow(D,2);
-        float delta = std::pow(b,2) - 4.0*a*c;
-	if (delta == 0.0 && -b/(2.0*a) >= 0)
-	{
-	    goal_point[0] = poses.poses[i].position.x + (-b/(2.0*a))*vectors[i][0];
-	    goal_point[1] = poses.poses[i].position.y + (-b/(2.0*a))*vectors[i][1];
-	    break;
-	}
-	else if (delta > 0.0)
-	{
-	    float z1 = (-b-std::sqrt(delta))/(2.0*a);
-	    float z2 = (-b+std::sqrt(delta))/(2.0*a);
-        float z = std::max(z1, z2);
-	    float segment = std::sqrt(std::pow(poses.poses[i+1].position.y - poses.poses[i].position.y, 2)+std::pow(poses.poses[i+1].position.x - poses.poses[i].position.x,2));
-		if (z <= segment )
-		{
-		    goal_point[0] = poses.poses[i].position.x + z*vectors[i][0];
-		    goal_point[1] = poses.poses[i].position.y + z*vectors[i][1];
-		    break;
-		}
-	}
-   }
-   if (i == nb_poses-1)
-   {
-	goal_point[0] = poses.poses[i].position.x;
-	goal_point[1] = poses.poses[i].position.y;
-   }
-   // Now that we have the goal point, let's change the coordinates of this point into robot's coordinates
-   theta_current -= PI/2.0;
-   float xgv = (goal_point[0] - x_current)*std::cos(theta_current) + (goal_point[1] - y_current)*std::sin(theta_current);
-   float ygv = -(goal_point[0] - x_current)*std::sin(theta_current) + (goal_point[1] - y_current)*std::cos(theta_current);
-   // Now we should calculate the curvature of the circle we want to follow to the point
-   float curvature = 2*xgv/std::pow(D,2);
-   ROS_INFO("YGV : %f",ygv);
-   if (ygv <= 0.01 && goal_point[0] == poses.poses[nb_poses-1].position.x && goal_point[1] == poses.poses[nb_poses-1].position.y)
-   {
-	float angular_difference = theta_current + PI/2.0 - poses.poses[nb_poses-1].orientation.w;
-	if (angular_difference > 0.1)
-	{
-	    move.linear.x = 0;
-	    move.angular.z = -0.6;
-	}
-	else if (angular_difference < -0.1)
-	{
-	    move.linear.x = 0;
-	    move.angular.z = 0.6;
-	}
-	else
-	{
-	    move.linear.x = 0;
-	    move.angular.z = 0;
-	    stop = true;
-	    delete vectors;
-	}
-   }
-   else if (xgv == 0.0)
-   {
-       move.linear.x = speed;
-       move.angular.z = 0;
-   }
-   else
-   {
-   // Then we calculate the angular_velocity necessary to follow the right trajectory
-       float time = (2*PI)/(curvature*speed);
-       move.linear.x = speed;
-       move.angular.z = -2*PI/time;
-   }
-   motor_pub.publish(move);
-}
-
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "path_following");
+    ros::init(argc, argv, "object_addition");
     PathFollowing P;
     ros::Rate r(100);
     while(ros::ok()) {

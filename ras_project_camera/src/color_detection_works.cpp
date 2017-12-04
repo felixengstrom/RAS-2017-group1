@@ -14,7 +14,7 @@
 
 
 
-static const std::string OPENCV_WINDOW = "Image window";
+//static const std::string OPENCV_WINDOW = "Image window";
 
 
 class ImageConverter
@@ -51,7 +51,7 @@ public:
     object_coord_pub = nh_.advertise<geometry_msgs::PointStamped>("/camera/object_coord",1);
     object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/object_detected",1);
 
-    cv::namedWindow(OPENCV_WINDOW);
+    //cv::namedWindow(OPENCV_WINDOW);
 
     ros::NodeHandle nh("~");
 
@@ -328,8 +328,8 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       
       ic.object_flag_pub.publish(object_flag);
 
-      cv::imshow(OPENCV_WINDOW, thresholded_frame);
-      cv::waitKey(3);  
+      //cv::imshow(OPENCV_WINDOW, thresholded_frame);
+      //cv::waitKey(3);  
     }
 
     ros::spinOnce();

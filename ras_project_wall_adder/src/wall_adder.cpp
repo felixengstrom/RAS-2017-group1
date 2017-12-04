@@ -20,7 +20,6 @@ struct Line{
     float x2;
     float y1;
     float y2;
-    // Wall type: Original wall = 0, added wall = 1
     int type;
 };
 
@@ -79,9 +78,9 @@ WallAdder::WallAdder(std::string map_file_,
           float POIminError_,
           int tolerance_,
           int minPOI_, int minPOIremove_):POImaxDist(POImaxDist_), POIminError(POIminError_),
-                       tolerance(tolerance_),minPOI(minPOI_), n(),
-                       minPOIremove(minPOIremove_), listener(),
-                       map_file(map_file_), new_map_file(new_map_file_)
+                                          tolerance(tolerance_),minPOI(minPOI_), n(),
+                                          minPOIremove(minPOIremove_), listener(),
+                                          map_file(map_file_), new_map_file(new_map_file_)
 {
     // Get the lidars position relative to robot
     tf::StampedTransform transform;
@@ -299,7 +298,6 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         ROS_INFO("x1 %f,y1 %f,x2 %f,y2 %f", line.x1, line.y1, line.x2, line.y2);
     }
     
-    publishPOI(dists);
     int w_id = wall_id[firstMax];
     if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
     {
@@ -497,15 +495,15 @@ int main(int argc, char*argv[])
     ros::NodeHandle nh("~");
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.7);
+    nh.param<float>("POImaxDist", POImaxDist, 0.8);
     float POIminError;
-    nh.param<float>("POIminError", POIminError, 0.1);
+    nh.param<float>("POIminError", POIminError, 0.15);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 4);
+    nh.param<int>("tolerance", tolerance, 5);
     int minPOI;
     nh.param<int>("minPOI", minPOI, 15);
     int minPOIremove;
-    nh.param<int>("minPOIremove", minPOIremove, 10);
+    nh.param<int>("minPOIremove", minPOIremove, 5);
 
     std::string map_file;
     nh.param<std::string>("map_file", map_file, "lab_maze_2017.txt");
