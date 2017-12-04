@@ -36,6 +36,7 @@ public:
   ros::Subscriber sub;
   ros::Subscriber sub_barcode;
   ros::Subscriber sub_color_detected;
+  ros::Publisher pub_object_detected;
   ros::Publisher pub_trap_coord;
   ros::Publisher pub_battery_coord;
   ros::Publisher pub_pcl_filtered;
@@ -48,16 +49,16 @@ public:
   int pixel_x, pixel_y;
   int min_size, min_battery_size;
 
-  detection(): cloud_blob(), min_size(100), min_battery_size(200), hasBarcode(0), color_detected(0)
+  detection(): cloud_blob(), min_size(100), min_battery_size(200), color_detected(0), hasBarcode(0)
   {
     sub = nh.subscribe ("/camera/depth/points", 1, &detection::cloud_cb, this);
     sub_barcode = nh.subscribe ("/barcode", 1, &detection::barcode_cb, this);
-    sub_color_detected = nh.subscribe ("/camera/object_detected", 1, &detection::color_detected_cb, this);
+    //sub_color_detected = nh.subscribe ("/camera/color_detected", 1, &detection::color_detected_cb, this);
+    pub_object_detected = nh.advertise<std_msgs::Bool>("/camera/detected", 1);
     pub_trap_coord = nh.advertise<geometry_msgs::PointStamped> ("/camera/trap_coord", 1);
-    //pub_battery_coord = nh.advertise<geometry_msgs::Quaternion> ("/camera/battery_coord", 1);
     pub_battery_coord = nh.advertise<geometry_msgs::QuaternionStamped> ("/camera/battery_coord", 1);
     pub_pcl_filtered = nh.advertise<sensor_msgs::PointCloud2> ("/camera/pcl_filtered", 1);
-    
+
     ros::NodeHandle nh("~");
     nh.getParam("min_size",min_size); 
     nh.getParam("min_battery_size",min_battery_size);
@@ -65,13 +66,13 @@ public:
   
   void barcode_cb (const std_msgs::String msg)
   {
-    hasBarcode = 1;
+    hasBarcode = true;
   }
 
-  void color_detected_cb (const std_msgs::Bool::ConstPtr& msg)
+  /*void color_detected_cb (const std_msgs::Bool::ConstPtr& msg)
   {
     color_detected = msg->data;
-  }
+  }*/
 
   void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
   {
@@ -81,7 +82,6 @@ public:
     pcl_conversions::toPCL(*cloud_msg, cloud_blob);
   }
 };
-
 
 int main (int argc, char** argv)
 {
@@ -171,34 +171,38 @@ int main (int argc, char** argv)
     }
     // is the point cloud an object
     int object_size = cloud_filtered->width * cloud_filtered->height;
-    //ROS_INFO("Object size: %d", object_size);
+    ROS_INFO("Object size: %d", object_size);
     //ROS_INFO("Min object size: %d", ic.min_size);
+    std_msgs::Bool object_detected;
 
     geometry_msgs::PointStamped trap_coord;
     trap_coord.header.stamp = ic.lastReading;
     trap_coord.header.frame_id = "camera";
 
-    //geometry_msgs::Quaternion battery_coord;
     geometry_msgs::QuaternionStamped battery_coord;
     battery_coord.header.stamp = ic.lastReading;
     battery_coord.header.frame_id = "camera";
-
     // trap detection 
     if (object_size > ic.min_size && ic.hasBarcode)
     {
       Eigen::Vector4f centroid;
-     // ROS_INFO("barcode cb: %d", ic.hasBarcode);
+      ROS_INFO("barcode cb: %d", ic.hasBarcode);
       pcl::compute3DCentroid(*cloud_filtered,centroid);
       ic.hasBarcode = 0;
-     // ROS_INFO("barcode cb: %d", ic.hasBarcode);
       trap_coord.point.x = centroid[2];
       trap_coord.point.y = centroid[0];
-      trap_coord.point.z = centroid[1];
-      ic.pub_trap_coord.publish (trap_coord);
+      trap_coord.point.z = centroid[1]; 
     }
-    // battery detection
-    else if (object_size > ic.min_battery_size && !ic.color_detected && !ic.hasBarcode)
+
+    else if (object_size > ic.min_size)
     {
+    object_detected.data = 1;
+    }
+
+    // battery detection
+    else if (object_size > ic.min_battery_size && !ic.hasBarcode)
+    {
+      //ROS_INFO("Min battery size: %d", ic.min_battery_size);
       // find the orientation
       float z_min = cloud_filtered->points[0].z;
       int z_min_ind = 0;
@@ -225,14 +229,14 @@ int main (int argc, char** argv)
 
       float angle = atan2(z_value, x_value)*180.0/M_PI;
       //std::cout << "angle: " << angle <<std::endl;
-
-
       battery_coord.quaternion.x = cloud_filtered->points[z_min_ind].z;
       battery_coord.quaternion.y = cloud_filtered->points[z_min_ind].x;
       battery_coord.quaternion.z = cloud_filtered->points[z_min_ind].y;
       battery_coord.quaternion.w = angle;
-      ic.pub_battery_coord.publish (battery_coord);
+      ic.pub_battery_coord.publish (battery_coord);  
     }
+    ic.pub_trap_coord.publish (trap_coord);
+    ic.pub_object_detected.publish(object_detected);
     
     // publish filtered cloud for visualization
     sensor_msgs::PointCloud2 output;

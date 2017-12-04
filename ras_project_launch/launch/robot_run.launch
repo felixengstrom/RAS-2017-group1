@@ -26,5 +26,5 @@
 
 	<node pkg="ras_project_error_detection" type="error_detection_node" name="error_detection" />
 	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
-    <node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" />
+    <!--node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" /-->
 </launch>

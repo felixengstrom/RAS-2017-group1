@@ -36,15 +36,15 @@ public:
   {
     sub = nh.subscribe ("/camera/depth_registered/points", 1, &camera_pcl::cloud_cb, this);
     sub_object_coord = nh.subscribe("/camera/object_coord", 10, &camera_pcl::object_coord_cb, this);
-    sub_object_detected = nh.subscribe("/camera/object_detected", 1, &camera_pcl::detection_cb, this);
+    //sub_object_detected = nh.subscribe("/camera/object_detected", 1, &camera_pcl::detection_cb, this);
     pub_world_coord = nh.advertise<geometry_msgs::PointStamped> ("/camera/world_coord", 100);
   }
 
-  void detection_cb(const std_msgs::Bool::ConstPtr& msg)
+  /*void detection_cb(const std_msgs::Bool::ConstPtr& msg)
   {
     object_detected = msg->data;
     //std::cerr << "object_detected" << object_detected << std::endl;
-  }
+  }*/
 
   void object_coord_cb (const geometry_msgs::PointStamped::ConstPtr& object_coord_msg)
   {
@@ -74,7 +74,7 @@ int main (int argc, char** argv)
   {
     
     //std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
-    if (ic.object_detected && ic.has_cloud && ic.has_coord_msg)
+    if (ic.has_cloud && ic.has_coord_msg)//(ic.object_detected && ic.has_cloud && ic.has_coord_msg)
       {
         int width = ic.point_pcl.width;
         int height = ic.point_pcl.height;
@@ -100,14 +100,12 @@ int main (int argc, char** argv)
         } 
         
         geometry_msgs::PointStamped coord_from_camera;
-	if (p.y>0.02)
-	{
+	
         coord_from_camera.header.stamp = ic.lastReading;
         coord_from_camera.point.x = p.z;
         coord_from_camera.point.y = p.x;
         coord_from_camera.point.z = p.y;
         ic.pub_world_coord.publish (coord_from_camera);
-	}
       }
 
       ros::spinOnce();

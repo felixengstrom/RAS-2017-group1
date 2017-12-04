@@ -24,13 +24,16 @@ class classification(object):
         self.object_detected = False
         self.cv_image = None
         self.lastReading = 0
+        self.barcode_detected = False
         self.sub_image = rospy.Subscriber('/camera/object_detected_image', Image, self.image_cb, queue_size = 1 ) #queue_size = 1, buff_size=self.buffer_size
+        self.sub_barcode = rospy.Subscriber('/barcode', String, self.barcode_cb, queue_size = 1)
         #self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 )
         self.pub_object_class = rospy.Publisher('/camera/object_class', stringStamped, queue_size = 1)
         self.bridge = CvBridge()
         
-        rospy.loginfo("subscribed to /camera/image/image_raw")
-        
+        #rospy.loginfo("subscribed to /camera/image/image_raw")
+    def barcode_cb (self, msg):
+        self.barcode_detected = True    
     def image_cb (self, img):
         #rospy.loginfo("in image callback")        
         self.cv_image = self.bridge.imgmsg_to_cv2(img, "bgr8")
@@ -53,8 +56,9 @@ def main(args):
     r = rospy.Rate(7)
 
     while not rospy.is_shutdown():
-		if(cl.object_detected == True):
+		if(cl.object_detected == True and cl.barcode_detected == False):
 			cl.object_detected = False
+                        cl.hasBarcode = False
 			t0 = time.time()
 			# Input 
 			# convert form cv:Mat to PIL
@@ -77,7 +81,7 @@ def main(args):
 			index, value = max(enumerate(pred), key=operator.itemgetter(1))
 			clas = classes[index]
 			#rospy.loginfo("index %i", index)
-			#rospy.loginfo("value %d, object class %s: ", value*100, clas)
+			rospy.loginfo("value %d, object class %s: ", value*100, clas)
 			# publish if prob higher 70%
 			if (value>0.7):
 				h = std_msgs.msg.Header()

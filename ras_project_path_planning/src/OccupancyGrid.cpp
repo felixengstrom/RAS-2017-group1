@@ -307,9 +307,8 @@ void OccupancyGrid::add_object(float x, float y, float radius)
 	float PI = std::acos(-1);
 	for (int i = 0; i < 360; i++)
 	{
-		int x_temp = std::max(0,(int) (x + radius*std::cos((float) i*PI/180.0))/_res);
-		int y_temp = std::max(0,(int) (y + radius*std::sin((float) i*PI/180.0))/_res);
-		ROS_INFO("x : %d, y : %d", x_temp, y_temp);
+		int x_temp = std::max(0,(int) ((x + radius*std::cos((float) i*PI/180.0))/_res));
+		int y_temp = std::max(0,(int) ((y + radius*std::sin((float) i*PI/180.0))/_res));
 		data_object[_width*y_temp+x_temp] =(int8_t)100;
 	}
 	stamp = ros::Time::now();
@@ -320,8 +319,8 @@ void OccupancyGrid::delete_object(float x, float y, float radius)
 	float PI = std::acos(-1);
 	for (int i = 0; i < 360; i++)
 	{
-		int x_temp = std::max(0,(int) (x + radius*std::cos((float) i*PI/180.0)))/_res;
-		int y_temp = std::max(0,(int) (y + radius*std::sin((float) i*PI/180.0)))/_res;
+		int x_temp = std::max(0,(int) ((x + radius*std::cos((float) i*PI/180.0))/_res));
+		int y_temp = std::max(0,(int) ((y + radius*std::sin((float) i*PI/180.0))/_res));
 		data_object[_width*y_temp+x_temp] =(int8_t)0;
 	}
 	stamp = ros::Time::now();
@@ -343,7 +342,6 @@ void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 void OccupancyGrid::ObjectCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
 {
 	int ID=(int)msg->pose.position.z; // temporary identifier
-	ROS_INFO("ID : %d",ID);
 	float radius;
 	switch(ID){
 		case 1 : //Add object to map

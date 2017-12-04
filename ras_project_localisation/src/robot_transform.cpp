@@ -45,7 +45,7 @@ void RobotBroadcaster::publishCurrentPose()
                                   "odom",t ,"map", transform);
     } catch(tf::TransformException &ex)
     {
-        ROS_INFO("particle update failed");
+        ROS_INFO("robot transform: particle update failed");
         std::cout << ex.what() << "\n";
     }
 

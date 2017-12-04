@@ -8,14 +8,12 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/String.h>
 #include <math.h>
 #include <stdlib.h>
 #include <sstream>
 
-
-
 //static const std::string OPENCV_WINDOW = "Image window";
-
 
 class ImageConverter
 { 
@@ -25,6 +23,7 @@ public:
   image_transport::Subscriber image_sub_;
   image_transport::Publisher image_pub_;
   ros::Subscriber detection_sub;
+  ros::Subscriber trap_sub;
   ros::Publisher object_coord_pub;
   ros::Publisher object_flag_pub;
   cv::Mat hsv_frame;
@@ -38,18 +37,18 @@ public:
   int yellow_h_max, yellow_s_max, yellow_v_max, yellow_h_min, yellow_s_min, yellow_v_min;
   int purple_h_max, purple_s_max, purple_v_max, purple_h_min, purple_s_min, purple_v_min;
   int orange_h_max, orange_s_max, orange_v_max, orange_h_min, orange_s_min, orange_v_min;
-  
-  
   int minTargetRadius, maxTargetRadius;
   bool detected;
+  bool barcode_detected;
 
-  ImageConverter(): it_(nh_), has_image(0), hsv_frame(), cv_ptr(), minTargetRadius(50), maxTargetRadius(150)
+  ImageConverter(): it_(nh_), has_image(0), hsv_frame(), cv_ptr(), minTargetRadius(50), maxTargetRadius(150), barcode_detected(0)
   {
     image_sub_ = it_.subscribe("/camera/rgb/image_raw", 1, &ImageConverter::ImageCb, this);
     image_pub_ = it_.advertise("/camera/object_detected_image", 1);
-    //detection_sub = nh_.subscribe("/camera/detection", 1, &ImageConverter::DetectionCb, this);
+    detection_sub = nh_.subscribe("/camera/detected", 1, &ImageConverter::DetectionCb, this);
+    trap_sub = nh_.subscribe("/barcode", 1, &ImageConverter::BarcodeCb, this);
     object_coord_pub = nh_.advertise<geometry_msgs::PointStamped>("/camera/object_coord",1);
-    object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/object_detected",1);
+    object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/color_detected",1);
 
     //cv::namedWindow(OPENCV_WINDOW);
 
@@ -106,8 +105,14 @@ public:
   
   void DetectionCb(const std_msgs::Bool::ConstPtr& msg)
   {
-    detected = msg->data;
-    //std::cerr << "detected" << detected << std::endl;
+    detected = true;
+    std::cerr << "detected" << detected << std::endl;
+  }
+
+  void BarcodeCb(const std_msgs::String msg)
+  {
+    barcode_detected = true;
+    std::cerr << "barcode_detected" << barcode_detected << std::endl;
   }
 
   void ImageCb(const sensor_msgs::ImageConstPtr& msg)
@@ -290,29 +295,31 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       size_t counts = center.size();
       std::cerr << "number of objects" << counts << std::endl;
 
-      // Visualisation 
       if (counts!=0)
       { 
-        cv::Scalar red(255,0,0);
+        // Visualisation 
+        /*cv::Scalar red(255,0,0);
         for( int i = 0; i < counts; i++)
         {
           cv::circle(thresholded_frame, center[i], radius[i], red, 3);
-        }
+        }*/
         object_flag.data = 1;
+        	if (ic.detected)// and !ic.barcode_detected)
+        	{
+          //Publish object coord
+          object_coord.point.x = center[0].x;
+          object_coord.point.y = center[0].y;
+          ic.object_coord_pub.publish(object_coord);
 
-        object_coord.point.x = center[0].x;
-        object_coord.point.y = center[0].y;
-        ic.object_coord_pub.publish(object_coord);
-
-        //Publish object detected image 
-
-        cv_bridge::CvImage out_msg;
-        out_msg.header.stamp = ic.lastReading;
-        //out_msg.encoding = sensor_msgs::image_encodings::TYPE_32FC2; 
-        out_msg.encoding = sensor_msgs::image_encodings::BGR8;
-        out_msg.image = ic.cv_ptr->image;
-        ic.image_pub_.publish(out_msg.toImageMsg());
-
+          //Publish object detected image 
+          cv_bridge::CvImage out_msg;
+          out_msg.header.stamp = ic.lastReading;
+          out_msg.encoding = sensor_msgs::image_encodings::BGR8;
+          out_msg.image = ic.cv_ptr->image;
+          ic.image_pub_.publish(out_msg.toImageMsg());
+          ic.detected = 0;
+          ic.barcode_detected = 0;
+          }
         /*// save images                               
         std::stringstream sstream;                               
         sstream << "object" << image_count << ".jpg" ;                  
@@ -325,7 +332,6 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       {
         object_flag.data = 0;
       }
-      
       ic.object_flag_pub.publish(object_flag);
 
       //cv::imshow(OPENCV_WINDOW, thresholded_frame);
@@ -335,6 +341,5 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
     ros::spinOnce();
     loop_rate.sleep();
   }
-  
   return 0;
 }

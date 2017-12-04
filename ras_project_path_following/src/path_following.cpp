@@ -36,8 +36,8 @@ class PathFollowing
 //		v_max = 0.5; // 0.2
 //		vGain = 0.5; //  1
 		D = 0.1;
-		normal_speed = 0.2;
-		speed = 0.2;
+		normal_speed = 0.1;
+		speed = 0.08;
 		stop = true;
 		first = false;
 		n = ros::NodeHandle();

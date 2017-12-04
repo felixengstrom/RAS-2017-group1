@@ -20,15 +20,14 @@ class ObjectAddition
 		ros::Subscriber image_sub;
 		ros::Publisher evidence_pub;
 		ros::Publisher occupgrid_pub;
-		ros::Time last_position_stamp;
 		std::list<ras_msgs::RAS_Evidence> waiting_objects;
 		std::list< std::vector<float> > classified_objects;
 		std::string filename;
 
 	public:
-	ObjectAddition()
+	ObjectAddition(): n(ros::NodeHandle())
 	{
-		n = ros::NodeHandle();
+		//n = ros::NodeHandle();
     		object_position_sub = n.subscribe("/map/objectCoord", 10, &ObjectAddition::objectPositionCallback,this);
 		trap_position_sub = n.subscribe("/map/trapCoord", 10, &ObjectAddition::trapPositionCallback, this);
 		battery_position_sub = n.subscribe("/map/batteryCoord", 10, &ObjectAddition::batteryPositionCallback, this);
@@ -62,7 +61,7 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 		{
 			if (it != waiting_objects.end())
 			{
-				delete(&(*it));
+				//delete(&(*it));
 				waiting_objects.erase(it);
 			}
 			return;
@@ -80,7 +79,7 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 	{
 		while (timestamp != waiting_objects.front().stamp)
 		{
-			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
+			//delete(&waiting_objects.front()); // Not sure if necessary, may cause error
 			waiting_objects.erase(waiting_objects.begin());
 		}
 		waiting_objects.front().object_location = *msg;
@@ -93,7 +92,7 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
 			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
-			delete(&waiting_objects.front());
+			//delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
 			geometry_msgs::PoseStamped object_map;
 			object_map.header.stamp = ros::Time::now();
@@ -120,7 +119,7 @@ void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped:
 		{
 			if (it != waiting_objects.end())
 			{
-				delete(&(*it));
+				//delete(&(*it));
 				waiting_objects.erase(it);
 			}
 			return;
@@ -128,7 +127,7 @@ void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped:
 	}
 	if (it != waiting_objects.end())
 	{
-		delete(&(*it));
+		//delete(&(*it));
 		waiting_objects.erase(it);
 	}
 	std::vector<float> object(4);
@@ -160,7 +159,7 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 		{
 			if (it != waiting_objects.end())
 			{
-				delete(&(*it));
+				//delete(&(*it));
 				waiting_objects.erase(it);
 			}
 			return;
@@ -168,7 +167,7 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 	}
 	if (it != waiting_objects.end())
 	{
-		delete(&(*it));
+		//delete(&(*it));
 		waiting_objects.erase(it);
 	}
 	std::vector<float> object(4);
@@ -206,7 +205,7 @@ void ObjectAddition::classificationCallback (const ras_project_camera::StringSta
 	{
 		while (timestamp != waiting_objects.front().stamp)
 		{
-			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
+			//delete(&waiting_objects.front()); // Not sure if necessary, may cause error
 			waiting_objects.erase(waiting_objects.begin());
 		}
 		waiting_objects.front().object_id = msg->data;
@@ -219,7 +218,7 @@ void ObjectAddition::classificationCallback (const ras_project_camera::StringSta
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
 			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
-			delete(&waiting_objects.front());
+			//delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
 			geometry_msgs::PoseStamped object_map;
 			object_map.header.stamp = ros::Time::now();
@@ -252,7 +251,7 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 	{
 		while (timestamp != waiting_objects.front().stamp)
 		{
-			delete(&waiting_objects.front()); // Not sure if necessary, may cause error
+			//delete(&waiting_objects.front()); // Not sure if necessary, may cause error
 			waiting_objects.erase(waiting_objects.begin());
 		}
 		waiting_objects.front().image_evidence = *msg;
@@ -265,7 +264,7 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
 			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
-			delete(&waiting_objects.front());
+			//delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
 			geometry_msgs::PoseStamped object_map;
 			object_map.header.stamp = ros::Time::now();
@@ -356,6 +355,7 @@ float ObjectAddition::classification_to_radius(int classification)
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "object_addition");
+    ObjectAddition object;
     ros::Rate r(100);
     while(ros::ok()) {
 	ros::spinOnce();

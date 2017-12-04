@@ -111,7 +111,7 @@ void transformPoint(const tf::TransformListener& listener, ros::Publisher map_pu
             ROS_ERROR("%s",ex.what());
         }
 
-       /* mapObjPos_msg.point.x = transform_map.getOrigin().x();
+        /*mapObjPos_msg.point.x = transform_map.getOrigin().x();
         mapObjPos_msg.point.y = transform_map.getOrigin().y();
         mapObjPos_msg.point.z = 0.0;
         mapObjPos_msg.header.frame_id = "map";
