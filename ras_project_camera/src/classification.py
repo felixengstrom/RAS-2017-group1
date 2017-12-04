@@ -42,7 +42,7 @@ def main(args):
     cl = classification()
     rospy.init_node('classification')
 
-    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/mobilenet_v3.h5'
+    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/mobilenet_v31.h5'
     #model = load_model(model_dir)
     with CustomObjectScope({
     	'relu6': relu6,

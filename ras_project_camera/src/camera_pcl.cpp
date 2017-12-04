@@ -50,7 +50,7 @@ public:
   {
     pixel_x = object_coord_msg->point.x;
     pixel_y = object_coord_msg->point.y;
-    std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
+    //std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
     lastReading = object_coord_msg->header.stamp;
     has_coord_msg = true;
   }
@@ -96,15 +96,18 @@ int main (int argc, char** argv)
         {
           pcl_index = (ic.pixel_y+dy[i])*width + (ic.pixel_x+dx[i]);
           p = ic.point_pcl.at(pcl_index);
-          //std::cerr << "value was nan " << std::endl;
+          std::cerr << "x y z  " <<p.x << " "<< p.y <<" " <<p.z<< std::endl;
         } 
         
         geometry_msgs::PointStamped coord_from_camera;
+	if (p.y>0.02)
+	{
         coord_from_camera.header.stamp = ic.lastReading;
         coord_from_camera.point.x = p.z;
         coord_from_camera.point.y = p.x;
         coord_from_camera.point.z = p.y;
         ic.pub_world_coord.publish (coord_from_camera);
+	}
       }
 
       ros::spinOnce();

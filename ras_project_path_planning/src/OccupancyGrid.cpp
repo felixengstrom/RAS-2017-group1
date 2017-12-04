@@ -29,7 +29,6 @@ class OccupancyGrid
 		ros::Publisher OG_pub; //the OccupancyGrid publisher
 		ros::Subscriber wall_sub; // the subscriber that add wall to the existing Occupancy grid
 		ros::Subscriber object_sub;// The subscriber that add obstacle (and object)?
-		ros::Subscriber wall_remov_sub;
 		//OccupancyGrid Data
 		//----------------------//
 		std::string _map_file; // Name of Map file
@@ -39,6 +38,7 @@ class OccupancyGrid
 		float _res;
 		int _width,_height;
 		std::vector<int8_t> data;
+		std::vector<int8_t> data_object;
     		geometry_msgs::Pose _origin;
 		ros::Time stamp, map_load_time;
 		//-----------//
@@ -53,8 +53,9 @@ class OccupancyGrid
 		bool Map_initialize();
 		void WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
 		void ObjectCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg);
-		void ConstructWall(const double x1, const double y1, const double x2, const double y2, int value);
-		void RemoveWallCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
+		void ConstructWall(const double x1, const double y1, const double x2, const double y2);
+		void add_object(float x, float y, float radius);
+		void delete_object(float x, float y, float radius);
 	public:
 		OccupancyGrid() : initialized(false), _map_OG("/maze_OccupancyGrid"),n("~")
 		{
@@ -67,29 +68,12 @@ class OccupancyGrid
     		OG_pub= n.advertise<nav_msgs::OccupancyGrid>( _map_OG,0);
 		wall_sub = n.subscribe("/wall_add",10,&OccupancyGrid::WallCallback,this);
 		object_sub = n.subscribe("/object_add",10,&OccupancyGrid::ObjectCallback,this);
-		wall_remov_sub = n.subscribe("/wall_remove",10,&OccupancyGrid::RemoveWallCallback,this);
 		}
 		
 		void loop_function();
 
 
 };
-void OccupancyGrid::RemoveWallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
-{
-
-	geometry_msgs::Pose adp; //add points
-	double x1,y1,x2,y2;
-	if(msg->poses.size()==2)
-	{
-		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y,0);
-		
-		stamp = ros::Time::now();
-    		map_load_time= ros::Time::now(); // Time() before
-	}
-	else ROS_INFO_STREAM("Wall Message recieved should be Two points!");
-
-}
-
 bool OccupancyGrid::Map_initialize()
 {
 if(initialized==true) return true;
@@ -142,6 +126,7 @@ if(initialized==true) return true;
     _width = (int)(mw/_res);
     _height = (int)(mh/_res);
     data.assign(_width*_height,0);
+    data_object.assign(_width*_height,0);
     //Initialize origin of map
      _origin;
 
@@ -174,7 +159,7 @@ if(initialized==true) return true;
         }
         // angle and distance
 		
-    	ConstructWall(x1,y1,x2,y2,100);
+    	ConstructWall(x1,y1,x2,y2);
     
     
     }
@@ -183,7 +168,7 @@ if(initialized==true) return true;
 }
 
 
-void OccupancyGrid::ConstructWall(const double x1, const double y1, const double x2, const double y2,int value)
+void OccupancyGrid::ConstructWall(const double x1, const double y1, const double x2, const double y2)
 {
 	//Bresenham's Line algorithm
 
@@ -219,8 +204,7 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(_width*Y+X <data.size())
 			{
-				if(data[_width*Y+X]!=100)
-					data[_width*Y+X]=(int8_t)value;
+			data[_width*Y+X]=(int8_t)100;
 			}
 			Y=Y+step;
 			
@@ -233,8 +217,7 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(_width*Y+X <data.size())
 			{
-				if(data[_width*Y+X]!=100)
-					data[_width*Y+X]=(int8_t)value;
+			data[_width*Y+X]=(int8_t)100;
 			}
 			X=X+1;
 		}	
@@ -248,8 +231,7 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		{
 			if(_width*Y+X <data.size())
 			{
-				if(data[_width*Y+X]!=100)
-				data[_width*Y+X]=(int8_t)value;
+			data[_width*Y+X]=(int8_t)100;
 			}
 			Y=Y+step;
 			p=p+B;
@@ -257,10 +239,8 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 		else
 		{
 			if(_width*Y+X <data.size())
-			{
-				if(data[_width*Y+X]!=100)
-					data[_width*Y+X]=(int8_t)value;
-			}
+			data[_width*Y+X]=(signed char)100;
+			
 			p=p+A;
 		}
 		X=X+1;
@@ -279,25 +259,45 @@ void OccupancyGrid::ConstructWall(const double x1, const double y1, const double
 			if(p>=0)
 			{
 				if(_width*Y+X <data.size())
-				{
-					if(data[_width*Y+X]!=100)
-					data[_width*Y+X]=(int8_t)value;
-				}
+				data[_width*Y+X]=(int8_t)100;
+				
 				X=X+1;
 				p=p+B;
 			}
 			else
 			{
 				if(_width*Y+X <data.size())
-				{
-					if(data[_width*Y+X]!=100)
-					data[_width*Y+X]=(int8_t)value;
-				}
+				data[_width*Y+X]=(signed char)100;
+				
 				p=p+A;
 			}
 			Y=Y+step;
 		}
 	}
+}
+void OccupancyGrid::add_object(float x, float y, float radius)
+{
+	float PI = std::acos(-1);
+	for (float i = 0; i < 2*PI; i += PI/180.0)
+	{
+		int x_temp = std::max(0,(int) (x + radius*std::cos(radius)))/_res;
+		int y_temp = std::max(0,(int) (y + radius*std::sin(radius)))/_res;
+		data_object[_width*y_temp+x_temp] =(int8_t)100;
+	}
+	stamp = ros::Time::now();
+    	map_load_time= ros::Time::now();
+}
+void OccupancyGrid::delete_object(float x, float y, float radius)
+{
+	float PI = std::acos(-1);
+	for (float i = 0; i < 2*PI; i += PI/180.0)
+	{
+		int x_temp = std::max(0,(int) (x + radius*std::cos(radius)))/_res;
+		int y_temp = std::max(0,(int) (y + radius*std::sin(radius)))/_res;
+		data_object[_width*y_temp+x_temp] =(int8_t)0;
+	}
+	stamp = ros::Time::now();
+    	map_load_time= ros::Time::now();
 }
 void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 {
@@ -305,7 +305,7 @@ void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 	double x1,y1,x2,y2;
 	if(msg->poses.size()==2)
 	{
-		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y, 50);
+		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y);
 		
 		stamp = ros::Time::now();
     		map_load_time= ros::Time::now(); // Time() before
@@ -314,13 +314,33 @@ void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 }
 void OccupancyGrid::ObjectCallback(const  geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-	int ID=(int)msg->pose.orientation.x; // temporary identifier
-
+	int ID=(int)msg->pose.position.x; // temporary identifier
+	float radius;
 	switch(ID){
-		case 1 : break; //Object
-		case 2 : break;	//Obstacle
-		case 3 : break;	//Battery
-		case 0 : break; //Delete object from map
+		case 1 : //Add object to map
+			radius = object_size;
+			add_object(msg->pose.position.x, msg->pose.position.y, radius);
+			break;
+		case -1 : //Delete object from map
+			radius = object_size;
+			delete_object(msg->pose.position.x, msg->pose.position.y, radius);
+			break;
+		case 2 : //Add obstacle to map
+			radius = obstacle_size;
+			add_object(msg->pose.position.x, msg->pose.position.y, radius);
+			break;
+		case -2 : //Delete obstacle from map
+			radius = obstacle_size;
+			delete_object(msg->pose.position.x, msg->pose.position.y, radius);
+			break;
+		case 3 : //Add battery to map
+			radius = battery_x;
+			add_object(msg->pose.position.x, msg->pose.position.y, radius);
+			break;
+		case -3 : //Delete Battery from map (should never arrive)
+			radius = battery_x;
+			delete_object(msg->pose.position.x, msg->pose.position.y, radius);
+			break;
 		default : break;
 	}
 }
@@ -334,10 +354,15 @@ void OccupancyGrid::loop_function()
     	OG.info.width = _width;
     	OG.info.height = _height;
     	OG.info.origin=_origin;    
-    	OG.data=data; // initialize free map
+	std::vector<int8_t> data_send;
+	data_send.assign(_width*_height,0);
+	for (int i = 0; i < _width*_height; i++)
+	{
+		data_send[i] = data[i] | data_object[i];
+	}
+    	OG.data=data_send; // initialize free map
     	OG.header.stamp = stamp; // Time() before
     	OG.header.frame_id= "/map";
-
     	OG.info.map_load_time= map_load_time; // Time() before
 	OG_pub.publish(OG);
 
