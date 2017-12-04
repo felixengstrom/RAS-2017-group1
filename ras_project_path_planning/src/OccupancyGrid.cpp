@@ -79,7 +79,7 @@ class OccupancyGrid
 };
 void OccupancyGrid::RemoveWallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 {
-
+    ROS_INFO_STREAM("REMOVE WALL CALLBACK entered!");
 	geometry_msgs::Pose adp; //add points
 	double x1,y1,x2,y2;
 	if(msg->poses.size()==2)
@@ -307,8 +307,8 @@ void OccupancyGrid::add_object(float x, float y, float radius)
 	float PI = std::acos(-1);
 	for (int i = 0; i < 360; i++)
 	{
-		int x_temp = std::max(0,(int) (x + radius*std::cos((float) i*PI/180.0)))/_res;
-		int y_temp = std::max(0,(int) (y + radius*std::sin((float) i*PI/180.0)))/_res;
+		int x_temp = std::max(0,(int) (x + radius*std::cos((float) i*PI/180.0))/_res);
+		int y_temp = std::max(0,(int) (y + radius*std::sin((float) i*PI/180.0))/_res);
 		ROS_INFO("x : %d, y : %d", x_temp, y_temp);
 		data_object[_width*y_temp+x_temp] =(int8_t)100;
 	}
@@ -330,7 +330,7 @@ void OccupancyGrid::delete_object(float x, float y, float radius)
 void OccupancyGrid::WallCallback(const geometry_msgs::PoseArray::ConstPtr& msg)
 {
 	geometry_msgs::Pose adp; //add points
-	double x1,y1,x2,y2;
+    ROS_INFO_STREAM("Add WALL CALLBACK entered!");
 	if(msg->poses.size()==2)
 	{
 		ConstructWall(msg->poses[0].position.x,msg->poses[0].position.y,msg->poses[1].position.x,msg->poses[1].position.y,50);

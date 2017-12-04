@@ -296,7 +296,7 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 	path_list.clear(); // new map, new path needed (keep in mind its not a new goal)
 	std::vector<int8_t>OG=msg->data;
 	//if(Csp.size() != width_height*width_height){ Csp.resize(width_height*width_height);}
-	
+    std::fill(Csp.begin(),Csp.end(),0);	
 	//Cspace creation
 	cells=(int)(r/_res);
 	int i,y,x;
