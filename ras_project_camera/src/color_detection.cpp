@@ -48,7 +48,7 @@ public:
     detection_sub = nh_.subscribe("/camera/detected", 1, &ImageConverter::DetectionCb, this);
     trap_sub = nh_.subscribe("/barcode", 1, &ImageConverter::BarcodeCb, this);
     object_coord_pub = nh_.advertise<geometry_msgs::PointStamped>("/camera/object_coord",1);
-    object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/color_detected",1);
+    object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/object_detected",1);
 
     //cv::namedWindow(OPENCV_WINDOW);
 
@@ -303,12 +303,22 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
         {
           cv::circle(thresholded_frame, center[i], radius[i], red, 3);
         }*/
+        int y_max = center[0].y;
+        int idx = 0;
+        for (int j = 1; j<counts; ++j)
+        {
+          if (y_max<center[j].y)
+          {
+            y_max = center[j].y;
+            idx = j;
+          }
+        }
         object_flag.data = 1;
-        	if (ic.detected)// and !ic.barcode_detected)
-        	{
+        	//if (ic.detected)// and !ic.barcode_detected)
+        	//{
           //Publish object coord
-          object_coord.point.x = center[0].x;
-          object_coord.point.y = center[0].y;
+          object_coord.point.x = center[idx].x;
+          object_coord.point.y = center[idx].y;
           ic.object_coord_pub.publish(object_coord);
 
           //Publish object detected image 
@@ -319,7 +329,7 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
           ic.image_pub_.publish(out_msg.toImageMsg());
           ic.detected = 0;
           ic.barcode_detected = 0;
-          }
+          //}
         /*// save images                               
         std::stringstream sstream;                               
         sstream << "object" << image_count << ".jpg" ;                  

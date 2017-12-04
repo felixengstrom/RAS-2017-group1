@@ -12,6 +12,7 @@ static geometry_msgs::PointStamped object_point;
 static bool object_present;
 static geometry_msgs::PointStamped trap_point;
 static bool trap_present;
+static bool detection_activated;
 
 void objectPosition_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
@@ -21,20 +22,18 @@ void objectPosition_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
   object_point.point.z = msg->point.z;
   object_point.header.frame_id = msg->header.frame_id;
   object_point.header.stamp = msg->header.stamp;
+  object_present = true;
+  if (trap_present)
+	trap_present = false;
 }
 void objectDetection_Callback(const std_msgs::Bool::ConstPtr& msg)
 {
-    object_present = msg->data;
-    if (trap_present)
-	trap_present = false;
-    /*if (battery_present)
-	battery_present = false;*/
+    detection_activated = msg->data;
 }
 
 void trapPosition_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
-    if (!trap_present)
-	trap_present = true;
+    trap_present = true;
     /*if (battery_present)
 	battery_present = false;*/
     trap_point.point.x = msg->point.x;
@@ -42,6 +41,8 @@ void trapPosition_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
     trap_point.point.z = msg->point.z;
     trap_point.header.frame_id = msg->header.frame_id;
     trap_point.header.stamp = msg->header.stamp;
+    if (object_present)
+	object_present = false;
 }
 
 /*void batteryPosition_Callback(const greometry_msgs::QuaternionStamped::ConstPtr& msg)
@@ -57,12 +58,13 @@ void trapPosition_Callback(const geometry_msgs::PointStamped::ConstPtr& msg)
     battery_point.header.stamp = msg->header.stamp;
 }*/
 
-void transformPoint(const tf::TransformListener& listener, ros::Publisher map_publisher)
+void transformPoint(const tf::TransformListener& listener, ros::Publisher object_pub, ros::Publisher trap_pub)
 {
     static tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
     tf::StampedTransform transform_map;
+    ros::Publisher map_publisher;
     //geometry_msgs::PointStamped mapObjPos_msg;
 
     //we'll create a point in the camera frame that we'd like to transform to the robot frame
@@ -70,22 +72,32 @@ void transformPoint(const tf::TransformListener& listener, ros::Publisher map_pu
  
     //we'll just use the most recent transform available for our simple example
     object_point.header.stamp = ros::Time(0);*/
-    if (trap_present && trap_point.header.stamp.toSec() + 1 < ros::Time::now().toSec())
-	trap_present = false;
-    if(TRUE == object_present || trap_present)
+    //if (trap_present && trap_point.header.stamp.toSec() + 2 < ros::Time::now().toSec())
+//	trap_present = false;
+  //  if (object_present && object_point.header.stamp.toSec() + 2 < ros::Time::now().toSec())
+//	object_present = false;
+    if (object_present)
+	ROS_INFO("Object : x: %f, y: %f, z: %f",object_point.point.x, object_point.point.y, object_point.point.z);
+    if (trap_present)
+	ROS_INFO("Trap : x: %f, y: %f, z: %f", trap_point.point.x, trap_point.point.y, trap_point.point.z);
+    if(TRUE == detection_activated && (object_present || trap_present))
     {
 	geometry_msgs::PointStamped point_base;
         try
         {
-	    if (object_present == TRUE)
+	    if (object_present)
 	    {
             	listener.transformPoint("robot", object_point, point_base);
 		point_base.header.stamp = object_point.header.stamp;
+		map_publisher = object_pub;
+		ROS_INFO("Object !");
   	    }
 	    else
 	    {
 		listener.transformPoint("robot", trap_point, point_base);
 		point_base.header.stamp = trap_point.header.stamp;
+		map_publisher = trap_pub;
+		ROS_INFO("Trap !");
 	    }
             ROS_INFO("object: (%.2f, %.2f. %.2f) -----> robot: (%.2f, %.2f, %.2f) at time %.2f",
             object_point.point.x, object_point.point.y, object_point.point.z,
@@ -137,10 +149,11 @@ int main(int argc, char** argv)
     //ros::Publisher batteryMap_publisher = n.advertise<geometry_msgs::TransformStamped>("/map/batteryCoord", 1);
     object_present = false;
     trap_present = false;
+    detection_activated = true;
 
    //we'll transform a point once every second
-   ros::Timer timer1 = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(objectMap_publisher)));
-   ros::Timer timer2 = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(trapMap_publisher)));
+   ros::Timer timer1 = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(objectMap_publisher), boost::ref(trapMap_publisher)));
+   //ros::Timer timer2 = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener), boost::ref(trapMap_publisher)));
    //ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformQuaternion, boost::ref(listener), boost::ref(batteryMap_publisher)));
  
    ros::spin();

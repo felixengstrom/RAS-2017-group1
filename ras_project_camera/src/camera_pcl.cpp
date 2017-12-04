@@ -37,7 +37,7 @@ public:
     sub = nh.subscribe ("/camera/depth_registered/points", 1, &camera_pcl::cloud_cb, this);
     sub_object_coord = nh.subscribe("/camera/object_coord", 10, &camera_pcl::object_coord_cb, this);
     //sub_object_detected = nh.subscribe("/camera/object_detected", 1, &camera_pcl::detection_cb, this);
-    pub_world_coord = nh.advertise<geometry_msgs::PointStamped> ("/camera/world_coord", 100);
+    pub_world_coord = nh.advertise<geometry_msgs::PointStamped> ("/camera/world_coord", 1);
   }
 
   /*void detection_cb(const std_msgs::Bool::ConstPtr& msg)
