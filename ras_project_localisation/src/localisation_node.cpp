@@ -2,6 +2,7 @@
 #include "sensor_msgs/PointCloud.h"
 #include "geometry_msgs/Point.h"
 #include "geometry_msgs/PoseStamped.h"
+#include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 #include <iostream>
@@ -27,56 +28,57 @@ class ParticleFilter
         std::normal_distribution<double> vel_noise;
         std::normal_distribution<double> ang_noise;
         std::vector<Line> map;
-        void initiateParticles( int nParticles);
         ros::Subscriber laser_sub;
+        ros::Subscriber initialpose_sub;
         ros::Publisher location_pub;
+        tf::TransformBroadcaster br;
         double lidar_displ_x;
         double lidar_displ_y;
         double lidar_displ_omega;
-        tf::TransformBroadcaster br;
         float ang_noise_factor;
         float lin_noise_factor;
+        void initiateParticles( int nParticles);
 
         
     public:
       
         bool hasScan;
         ParticleFilter(geometry_msgs::PoseStamped initialPose,
-                       int _nParticles,
-                       int _nScans,
-                       std::vector<Line> _map, 
-                       float ang_noise_factor_,
-                       float lin_noise_factor_);
+            int _nParticles,
+            int _nScans,
+            std::vector<Line> _map, 
+            float ang_noise_factor_,
+            float lin_noise_factor_);
         void update_lastPose();
         tf::TransformListener listener;
         geometry_msgs::PoseStamped lastPose;
         sensor_msgs::LaserScan latest_scan;
         sensor_msgs::PointCloud particles;
         std::vector<float> rayTrace(const geometry_msgs::Point32 &pos,
-                                    float angle,
-                                    const std::vector<float> &angles);
-        void update_particles_position(ros::Time t, float ang_noise_f, float lin_noise_f);
+            float angle,
+            const std::vector<float> &angles);
+        void update_particles_position(ros::Time t,
+            float ang_noise_f,
+            float lin_noise_f);
         void update_particles_weight();
         void resample_particles(float noise);
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
+        void initialposeCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg);
 };
 
 bool myfunction (int i,int j) { return (i>j); }
 
-ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
-                               int _nParticles,
-                               int _nScans,
-                               std::vector<Line> _map,
-                               float ang_noise_factor_,
-                               float lin_noise_factor_):nParticles(_nParticles), 
-                                                       vel_noise(0,0.1),
-                                                       n(),nScans(_nScans),
-                                                       ang_noise(0,0.05), 
-                                                       particles(), map(_map),
-                                                       hasScan(false),
-                                                       br(),
-                                                       ang_noise_factor(ang_noise_factor_),
-                                                       lin_noise_factor(lin_noise_factor_)
+ParticleFilter::ParticleFilter(
+    geometry_msgs::PoseStamped initialPose,
+    int _nParticles,
+    int _nScans,
+    std::vector<Line> _map,
+    float ang_noise_factor_,
+    float lin_noise_factor_):
+        nParticles(_nParticles), vel_noise(0,0.1), n(),nScans(_nScans),
+        ang_noise(0,0.05), particles(), map(_map), hasScan(false),
+        br(), ang_noise_factor(ang_noise_factor_),
+        lin_noise_factor(lin_noise_factor_)
 {   
     initialPose.header.stamp = ros::Time::now();
     tf::StampedTransform transform;
@@ -96,6 +98,14 @@ ParticleFilter::ParticleFilter(geometry_msgs::PoseStamped initialPose,
     lastPose = initialPose;
     initiateParticles(nParticles);
     laser_sub = n.subscribe("scan", 1, &ParticleFilter::scanCallback, this);
+    initialpose_sub = n.subscribe("initialpose", 1, &ParticleFilter::initialposeCallback, this);
+}
+void ParticleFilter::initialposeCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg)
+{  
+    ROS_INFO("inital_callback");
+    lastPose.pose = msg->pose.pose;
+    lastPose.header = msg->header;
+    initiateParticles(nParticles);
 }
 
 void ParticleFilter::initiateParticles( int nParticles)
@@ -104,7 +114,7 @@ void ParticleFilter::initiateParticles( int nParticles)
     tf::StampedTransform transform;
     geometry_msgs::Point initialPoint = lastPose.pose.position;
     double initialAng = atan2(lastPose.pose.orientation.z,
-                              lastPose.pose.orientation.w)*2;
+            lastPose.pose.orientation.w)*2;
 
     std::vector<geometry_msgs::Point32> ps(nParticles); 
     std::vector<sensor_msgs::ChannelFloat32> ch(nParticles);
@@ -213,8 +223,8 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
         //omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
-        particles.points[i].x += cos(alpha)*vt + vt*(float)vel_noise(rng)*cos(alpha)*lin_noise_f;
-        particles.points[i].y += sin(alpha)*vt + vt*(float)vel_noise(rng)*sin(alpha)*lin_noise_f;
+        particles.points[i].x += cos(alpha)*vt+  vt*(float)vel_noise(rng)*cos(alpha)*lin_noise_f*100;
+        particles.points[i].y += sin(alpha)*vt +  vt*(float)vel_noise(rng)*sin(alpha)*lin_noise_f*100;
     }
 }
 
@@ -416,13 +426,13 @@ int main(int argc, char*argv[])
     pp.pose.orientation.z = sin(alpha/2);
     ROS_INFO("x_start %f, ystart %f, omega_start %f", x_start, y_start, omega_start);
     
-    ParticleFilter pf(pp, 1000,8, map, 0.3, 0.5);   
+    ParticleFilter pf(pp, 1000,8, map, 0.1, 0.1);   
 
     ros::Rate rate(100);
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();
-            pf.resample_particles(0.2);
+            pf.resample_particles(0.05);
         }
         pf.update_lastPose();
         parts.publish(pf.particles);

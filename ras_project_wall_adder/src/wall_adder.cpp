@@ -58,6 +58,7 @@ class WallAdder{
         void removeWall(Line line);
 
     public:
+        ros::Time t;
         void publishPOI(std::vector<float> dists);
         void loadMap();
         // Constructor
@@ -112,7 +113,7 @@ void WallAdder::publishMap()
     visualization_msgs::MarkerArray all_markers;
     visualization_msgs::Marker wall_marker;
     wall_marker.header.frame_id = "map";
-    wall_marker.header.stamp = ros::Time::now();
+    wall_marker.header.stamp = t ;
     wall_marker.ns = "world";
     wall_marker.type = visualization_msgs::Marker::CUBE;
     wall_marker.action = visualization_msgs::Marker::ADD;
@@ -178,7 +179,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     sensor_msgs::LaserScan truey(*msg);
 
     tf::StampedTransform transform;
-    ros::Time t = truey.header.stamp;
+    t = truey.header.stamp;
     try{
         listener.waitForTransform("map","est_pos",
                               t, ros::Duration(2));
@@ -501,13 +502,13 @@ int main(int argc, char*argv[])
     float POImaxDist;
     nh.param<float>("POImaxDist", POImaxDist, 0.8);
     float POIminError;
-    nh.param<float>("POIminError", POIminError, 0.15);
+    nh.param<float>("POIminError", POIminError, 0.2);
     int tolerance;
     nh.param<int>("tolerance", tolerance, 5);
     int minPOI;
     nh.param<int>("minPOI", minPOI, 15);
     int minPOIremove;
-    nh.param<int>("minPOIremove", minPOIremove, 5);
+    nh.param<int>("minPOIremove", minPOIremove, 10);
 
     std::string map_file;
     nh.param<std::string>("map_file", map_file, "lab_maze_2017.txt");
@@ -527,7 +528,6 @@ int main(int argc, char*argv[])
         wa.publishMap();
         ros::spinOnce();
         rate.sleep();
-
     }
     //wa.saveMap(new_map_file);
 
