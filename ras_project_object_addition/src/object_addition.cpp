@@ -58,12 +58,6 @@ class ObjectAddition
 		evidence_pub = n.advertise<ras_msgs::RAS_Evidence>("/evidence", 1);
 		occupgrid_pub = n.advertise<geometry_msgs::PoseStamped>("/object_add", 1);
 		filename = "/home/ras11/catkin_ws/src/ras_project/ras_project_object_addition/classified_objects.txt";
-		std::vector<float> a(4);
-		a[0] = 0.3;
-		a[1] = 1.0;
-		a[2] = 0.6;
-		a[3] = 0.4;
-		classified_objects.push_back(a);
 		exit_x_area = 0.3;
 		exit_y_area = 0.3;
 	}
@@ -82,9 +76,10 @@ class ObjectAddition
 
 void ObjectAddition::pickupCallback(const ras_project_brain::ObjPickup_Update::ConstPtr& msg)
 {
-	for(it = classified_objects; it != classified_objects.end(); it++)
+	std::list< std::vector<float> >::iterator it;
+	for(it = classified_objects.begin(); it != classified_objects.end(); it++)
 	{
-		if ((*it)[0] == msg->coord.point.x && (*it)[1] == msg->coord.point.y && (*it)[2] = msg->coord.point.z && msg->pickedUp)
+		if ((*it)[0] == msg->coord.x && (*it)[1] == msg->coord.y && (*it)[2] == msg->coord.z && msg->pickedUp)
 		{
 			geometry_msgs::PoseStamped pose;
 			pose.header.stamp = ros::Time::now();
@@ -216,13 +211,13 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 			waiting_objects.front().stamp = ros::Time::now();
 			update.data = true;
 			coord_update_pub.publish(update);
-			evidence_pub.publish(waiting_objects.front());
 			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
 			object[1] = waiting_objects.front().object_location.transform.translation.y;
 			object[2] = waiting_objects.front().object_location.transform.translation.z;
 			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
+			evidence_pub.publish(waiting_objects.front());
 			//delete(&waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
 			geometry_msgs::PoseStamped object_map;
@@ -279,7 +274,7 @@ void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped:
 	object_map.header.stamp = ros::Time::now();
 	object_map.pose.position.x = object[0];
 	object_map.pose.position.y = object[1];
-	object_map.pose.position.z = 2;
+	object_map.pose.position.z = 2.0;
 	occupgrid_pub.publish(object_map);
 	return;
 }
@@ -358,7 +353,6 @@ void ObjectAddition::classificationCallback (const ras_project_camera::StringSta
 			update.data = true;
 			coord_update_pub.publish(update);
 			waiting_objects.front().stamp = ros::Time::now();
-			evidence_pub.publish(waiting_objects.front());
 			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
 			object[1] = waiting_objects.front().object_location.transform.translation.y;
@@ -366,6 +360,7 @@ void ObjectAddition::classificationCallback (const ras_project_camera::StringSta
 			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
 			//delete(&waiting_objects.front());
+			evidence_pub.publish(waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
 			geometry_msgs::PoseStamped object_map;
 			object_map.header.stamp = ros::Time::now();
@@ -408,7 +403,6 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 			update.data = true;
 			coord_update_pub.publish(update);
 			waiting_objects.front().stamp = ros::Time::now();
-			evidence_pub.publish(waiting_objects.front());
 			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
 			object[1] = waiting_objects.front().object_location.transform.translation.y;
@@ -416,6 +410,7 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 			object[3] = classification_string_to_int((std::string) waiting_objects.front().object_id);
 			classified_objects.push_back(object);
 			//delete(&waiting_objects.front());
+			evidence_pub.publish(waiting_objects.front());
 			waiting_objects.erase(waiting_objects.begin());
 			geometry_msgs::PoseStamped object_map;
 			object_map.header.stamp = ros::Time::now();

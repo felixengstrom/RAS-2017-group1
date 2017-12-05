@@ -302,7 +302,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     }
     
     int w_id = wall_id[firstMax];
-    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
+    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove && false)
     {
         ROS_INFO("trying to remove wall");
         removeWall(map[w_id]);

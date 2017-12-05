@@ -45,6 +45,7 @@ public:
     ros::Publisher robot_destination_publisher;
     ros::Publisher arm_engageSuction_publisher;
     ros::Publisher object_listLoad_publisher;
+    ros::Publisher robot_stop_publisher;
 
     ros::Publisher uarm_pickup_publisher;
     ros::Subscriber uarm_pickup_ack_subscriber;
@@ -73,6 +74,7 @@ public:
         slowMotor_toUpdate = goto_goal_flag = 0;
         pickup_complete = 0;
         uarm_smTrigger = 0;
+        stop_robot = 0;
         current_state = PRE_INITIAL_STATE;
         current_state_exit = GOTO_GOAL;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
@@ -82,6 +84,7 @@ public:
         robot_destination_publisher = n.advertise<geometry_msgs::PoseStamped>("/robot/goal", 1);
         arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
         object_listLoad_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
+        robot_stop_publisher = n.advertise<std_msgs::Bool>("/robot/stop",1);
 
         uarm_pickup_publisher = n.advertise<std_msgs::Bool>("/brain/smStart", 1);
         uarm_pickup_ack_subscriber = n.subscribe("/brain/smEnd", 3, &FirstRunNode::uarmSMCompleteAckCallback, this);
@@ -251,6 +254,9 @@ public:
                 break;
             case OBJ_DETECTION_STATE:
                 current_state = OBJ_PICKUP_STATE;
+                stop_robot = 1;
+                msg_stopRobot_bool.data = stop_robot;
+                robot_stop_publisher.publish(msg_stopRobot_bool);
                 uarm_smTrigger = 1;
                 msg_uarm_pickup_bool.data = uarm_smTrigger;
                 uarm_pickup_publisher.publish(msg_uarm_pickup_bool);
@@ -262,6 +268,9 @@ public:
             case OBJ_PICKUP_STATE:
                 ROS_INFO("In state initial");
                 current_state = INITIAL_STATE;
+                stop_robot = 0;
+                msg_stopRobot_bool.data = stop_robot;
+                robot_stop_publisher.publish(msg_stopRobot_bool);
                 /*Stop the object pickup command*/
                 uarm_smTrigger = 0;
                 msg_uarm_pickup_bool.data = uarm_smTrigger;
@@ -315,6 +324,9 @@ public:
                     arm_engageSuction_publisher.publish(msg_uarm_engageSuction_bool);
                 break;
                 default:
+                    stop_robot = 1;
+                    msg_stopRobot_bool.data = stop_robot;
+                    robot_stop_publisher.publish(msg_stopRobot_bool);
                     ROS_INFO("Task over");
             }
         }
@@ -322,7 +334,7 @@ public:
 
 private:
     std::string classString;
-    bool object_detected_current, start_coordCalc, object_detected_prev;
+    bool object_detected_current, start_coordCalc, object_detected_prev, stop_robot;
     bool slowMotor_toUpdate, exploration_start_stop, pickup_object,exploration_completion;
     bool uarm_smTrigger, sm_complete_ack, engage_suction, goto_goal_flag, pickup_complete;
     bool startup_flag;
@@ -334,6 +346,7 @@ private:
     geometry_msgs::Point robotPosition;
     std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool,obj_startupLoad_bool;
     std_msgs::Bool msg_motorSlowDown_bool, msg_uarm_pickup_bool, msg_uarm_engageSuction_bool;
+    std_msgs::Bool msg_stopRobot_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
     ros::Time begin;
     object_details list[40];

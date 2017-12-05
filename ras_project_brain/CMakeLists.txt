@@ -29,8 +29,8 @@ catkin_package(CATKIN_DEPENDS roscpp rospy geometry_msgs std_msgs message_runtim
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(brain_node src/mainRun_node.cpp)
-#add_executable(brain_node src/firstRun_node.cpp)
+#add_executable(brain_node src/mainRun_node.cpp)
+add_executable(brain_node src/firstRun_node.cpp)
 add_dependencies(brain_node ras_project_brain_generate_messages_cpp)
 target_link_libraries(brain_node ${catkin_LIBRARIES})
 

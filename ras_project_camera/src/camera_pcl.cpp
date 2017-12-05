@@ -50,7 +50,7 @@ void object_coord_cb (const geometry_msgs::PointStamped::ConstPtr& object_coord_
 {
 pixel_x = object_coord_msg->point.x;
 pixel_y = object_coord_msg->point.y;
-std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
+//std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
 lastReading = object_coord_msg->header.stamp;
 has_coord_msg = true;
 }

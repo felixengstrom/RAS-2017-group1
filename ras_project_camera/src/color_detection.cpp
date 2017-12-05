@@ -15,7 +15,7 @@
 
 
 using namespace cv;
-static const std::string OPENCV_WINDOW = "Image window";
+//static const std::string OPENCV_WINDOW = "Image window";
 
 class ImageConverter
 { 
@@ -51,7 +51,7 @@ public:
     object_coord_pub = nh_.advertise<geometry_msgs::PointStamped>("/camera/object_coord",1);
     object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/object_detected",1);
 
-    cv::namedWindow(OPENCV_WINDOW);
+    //cv::namedWindow(OPENCV_WINDOW);
 
     ros::NodeHandle nh("~");
 
@@ -178,8 +178,8 @@ public:
   {
     cv::circle(thresholded, center[i], radius[i], red, 3);
   }
-  cv::imshow(OPENCV_WINDOW, thresholded);
-  cv::waitKey(3);
+  //cv::imshow(OPENCV_WINDOW, thresholded);
+  //cv::waitKey(3);
   
   return center;
   }
