@@ -2,8 +2,8 @@
     <arg name="x_start" default="0.22"/>
     <arg name="y_start" default="0.22"/>
     <arg name="omega_start" default="1.6"/>
-    <arg name="Wall_step" default="0"/>
-    <arg name="Wall_cost" default="10"/>
+    <arg name="Wall_step" default="2"/>
+    <arg name="Wall_cost" default="100"/>
 	<arg name="map_file" default="lab_maze_2017.txt"/>
     <include file="$(find ras_project_localisation)/launch/localisation.launch" >
         <arg name="x_start" value="$(arg x_start)"/>
@@ -23,7 +23,9 @@
 		<param name="Wall_cost" value="$(arg Wall_cost)" />
     </node>
 
-	<node pkg="ras_project_error_detection" type="error_detection_node" name="error_detection" />
+	<node pkg="ras_project_error_detection" type="error_detection_node" name="error_detection"/>
 	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
-    <node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" />
+    <node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" >
+        <param name="exploration_percentage" value = "0.5" />
+    </node>
 </launch>

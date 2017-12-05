@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <std_msgs/Float32.h>
+#include <std_msgs/Bool.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <tf/transform_broadcaster.h>
 #include <stdlib.h>
@@ -10,6 +11,7 @@
 
 double lin_vel_;
 double ang_vel_;
+bool hold = false;
 const static float PI = acos(-1);
 
 
@@ -17,6 +19,10 @@ void teleopCallback (const geometry_msgs::Twist::ConstPtr& msg)
 {
     lin_vel_ = msg->linear.x;
     ang_vel_ = msg->angular.z;
+}
+void holdCallback (const std_msgs::Bool::ConstPtr& msg)
+{
+    hold = msg->data;
 }
 
 int main (int argc, char **argv)
@@ -28,10 +34,12 @@ int main (int argc, char **argv)
     ros::NodeHandle n_;
 
     ros::Subscriber teleop_sub;
+    ros::Subscriber hold_sub;
     ros::Publisher est_vel_pub;
     
-    teleop_sub = n_.subscribe("motor_teleop/twist", 10, teleopCallback);
-    est_vel_pub = n_.advertise<geometry_msgs::TwistStamped>("est_robot_vel/twist", 10);
+    teleop_sub = n_.subscribe("motor_teleop/twist", 1, teleopCallback);
+    hold_sub = n_.subscribe("hold", 1, holdCallback);
+    est_vel_pub = n_.advertise<geometry_msgs::TwistStamped>("est_robot_vel/twist", 1);
 
     geometry_msgs::PoseStamped truepose;
     tf::TransformBroadcaster br;
@@ -58,9 +66,12 @@ int main (int argc, char **argv)
         ros::Time current  = ros::Time::now();
         ros::Duration elapsed = current-last;
         last = current;
-        current_x = current_x +elapsed.toSec()*lin_vel_*cos(current_omega + ang_vel_*0.05);
-        current_y = current_y +elapsed.toSec()*lin_vel_*sin(current_omega + ang_vel_*0.05);
-        current_omega = current_omega + ang_vel_*elapsed.toSec();
+        if (!hold)
+        {
+            current_x = current_x +elapsed.toSec()*lin_vel_*cos(current_omega + ang_vel_*0.05);
+            current_y = current_y +elapsed.toSec()*lin_vel_*sin(current_omega + ang_vel_*0.05);
+            current_omega = current_omega + ang_vel_*elapsed.toSec();
+        }
             
         q.setRPY(0, 0, current_omega);
         transform.setOrigin( tf::Vector3(current_x, current_y, 0.0) );
@@ -72,11 +83,9 @@ int main (int argc, char **argv)
         mes.header.stamp = ros::Time::now();
         mes.twist.linear.x = lin_vel_ + abs(lin_vel_*noise(rng)*0);
         mes.twist.angular.z = ang_vel_+ ang_vel_*noise(rng)*0;
-
         est_vel_pub.publish(mes);
 
         // Todo: add code to publish simulated postion on map
-
         ros::spinOnce();
         rate.sleep();
     }

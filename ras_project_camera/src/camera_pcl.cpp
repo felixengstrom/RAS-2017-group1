@@ -36,21 +36,21 @@ public:
   {
     sub = nh.subscribe ("/camera/depth_registered/points", 1, &camera_pcl::cloud_cb, this);
     sub_object_coord = nh.subscribe("/camera/object_coord", 10, &camera_pcl::object_coord_cb, this);
-    sub_object_detected = nh.subscribe("/camera/object_detected", 1, &camera_pcl::detection_cb, this);
+    //sub_object_detected = nh.subscribe("/camera/object_detected", 1, &camera_pcl::detection_cb, this);
     pub_world_coord = nh.advertise<geometry_msgs::PointStamped> ("/camera/world_coord", 100);
   }
 
-  void detection_cb(const std_msgs::Bool::ConstPtr& msg)
+  /*void detection_cb(const std_msgs::Bool::ConstPtr& msg)
   {
     object_detected = msg->data;
-    std::cerr << "object_detected" << object_detected << std::endl;
-  }
+    //std::cerr << "object_detected" << object_detected << std::endl;
+  }*/
 
   void object_coord_cb (const geometry_msgs::PointStamped::ConstPtr& object_coord_msg)
   {
     pixel_x = object_coord_msg->point.x;
     pixel_y = object_coord_msg->point.y;
-    std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
+    //std::cerr << "x y" <<pixel_x << pixel_y << std::endl;
     lastReading = object_coord_msg->header.stamp;
     has_coord_msg = true;
   }
@@ -59,7 +59,7 @@ public:
   {
     pcl::fromROSMsg(*cloud_msg, point_pcl);
     has_cloud = true;
-    std::cerr << "has cloud " << has_cloud << std::endl;  
+    //std::cerr << "has cloud " << has_cloud << std::endl;  
   }
 
 };
@@ -73,8 +73,8 @@ int main (int argc, char** argv)
   while (ros::ok())
   {
     
-    std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
-    if (ic.object_detected && ic.has_cloud && ic.has_coord_msg)
+    //std::cerr << ic.object_detected << " " << ic.has_cloud << " " << ic.has_coord_msg << std::endl;
+    if (ic.has_cloud && ic.has_coord_msg)//(ic.object_detected && ic.has_cloud && ic.has_coord_msg)
       {
         int width = ic.point_pcl.width;
         int height = ic.point_pcl.height;
@@ -96,10 +96,11 @@ int main (int argc, char** argv)
         {
           pcl_index = (ic.pixel_y+dy[i])*width + (ic.pixel_x+dx[i]);
           p = ic.point_pcl.at(pcl_index);
-          //std::cerr << "value was nan " << std::endl;
+          //std::cerr << "x y z  " <<p.x << " "<< p.y <<" " <<p.z<< std::endl;
         } 
         
         geometry_msgs::PointStamped coord_from_camera;
+	
         coord_from_camera.header.stamp = ic.lastReading;
         coord_from_camera.point.x = p.z;
         coord_from_camera.point.y = p.x;

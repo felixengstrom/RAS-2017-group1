@@ -16,7 +16,7 @@
     <include file="$(find ras_project_camera)/launch/camera.launch" />
     <node pkg="ras_project_odometry" type="odometry_node" name="odometry_node"/>
     <node pkg="ras_project_lidar" type="lidar_transform" name="lidar_transform"/>
-	<node pkg="ras_project_path_planning" type="OccupancyGrid_node" name="OccupancyGrid_node">
+	<node pkg="ras_project_path_planning" type="OccupancyGrid_node" name="OccupancyGrid_node" output="screen">
 		<param name="map_file" value="$(find ras_project_localisation)/map/$(arg map_file)" />
 	</node>
 	<node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node" output="screen">
@@ -26,5 +26,5 @@
 
 	<node pkg="ras_project_error_detection" type="error_detection_node" name="error_detection" />
 	<node pkg="ras_project_path_following" type="path_following" name="path_following" />
-    <node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" />
+    <!--node pkg="ras_project_path_planning" type="Exploration_mode" name="Exploration_mode" /-->
 </launch>

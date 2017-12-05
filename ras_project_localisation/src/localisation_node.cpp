@@ -416,9 +416,9 @@ int main(int argc, char*argv[])
     pp.pose.orientation.z = sin(alpha/2);
     ROS_INFO("x_start %f, ystart %f, omega_start %f", x_start, y_start, omega_start);
     
-    ParticleFilter pf(pp, 1000,8, map, 0.1, 0.1);   
+    ParticleFilter pf(pp, 1000,8, map, 0.3, 0.5);   
 
-    ros::Rate rate(10);
+    ros::Rate rate(100);
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();

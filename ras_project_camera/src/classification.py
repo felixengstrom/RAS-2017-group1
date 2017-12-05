@@ -24,13 +24,16 @@ class classification(object):
         self.object_detected = False
         self.cv_image = None
         self.lastReading = 0
+        self.barcode_detected = False
         self.sub_image = rospy.Subscriber('/camera/object_detected_image', Image, self.image_cb, queue_size = 1 ) #queue_size = 1, buff_size=self.buffer_size
+        self.sub_barcode = rospy.Subscriber('/barcode', String, self.barcode_cb, queue_size = 1)
         #self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 )
         self.pub_object_class = rospy.Publisher('/camera/object_class', stringStamped, queue_size = 1)
         self.bridge = CvBridge()
         
-        rospy.loginfo("subscribed to /camera/image/image_raw")
-        
+        #rospy.loginfo("subscribed to /camera/image/image_raw")
+    def barcode_cb (self, msg):
+        self.barcode_detected = True    
     def image_cb (self, img):
         #rospy.loginfo("in image callback")        
         self.cv_image = self.bridge.imgmsg_to_cv2(img, "bgr8")
@@ -42,7 +45,7 @@ def main(args):
     cl = classification()
     rospy.init_node('classification')
 
-    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/mobilenet_v3.h5'
+    model_dir = '/home/ras11/catkin_ws/src/ras_project/ras_project_camera/src/mobilenet_v31.h5'
     #model = load_model(model_dir)
     with CustomObjectScope({
     	'relu6': relu6,
@@ -53,8 +56,9 @@ def main(args):
     r = rospy.Rate(7)
 
     while not rospy.is_shutdown():
-		if(cl.object_detected == True):
+		if(cl.object_detected == True and cl.barcode_detected == False):
 			cl.object_detected = False
+                        cl.hasBarcode = False
 			t0 = time.time()
 			# Input 
 			# convert form cv:Mat to PIL
@@ -73,7 +77,7 @@ def main(args):
 			#print (pred)
 
 			t1 = time.time()
-			print("prediction time: {:0.3f}s".format(t1-t0))
+			#print("prediction time: {:0.3f}s".format(t1-t0))
 			index, value = max(enumerate(pred), key=operator.itemgetter(1))
 			clas = classes[index]
 			#rospy.loginfo("index %i", index)

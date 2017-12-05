@@ -67,7 +67,9 @@ void ErrorDetector::estPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &
         double yDiffOdom = transform.getOrigin().y();
         double omegaDiffOdom = tf::getYaw(transform.getRotation());
         double totDiffOdom = std::sqrt(std::pow(xDiffOdom,2) + std::pow(yDiffOdom, 2));
-        if (std::abs(totDiffEst-totDiffOdom) > 0.1 || std::abs(omegaDiffEst-omegaDiffOdom) > 0.2)
+        ROS_INFO("totdiff est: %f totdiff odom: %f", totDiffEst, totDiffOdom);
+        ROS_INFO("omega est: %f omega odom: %f", omegaDiffEst, omegaDiffOdom);
+        if (std::abs(totDiffEst-totDiffOdom) > 0.02 || std::abs(omegaDiffEst-omegaDiffOdom) > 0.5)
         {
             std_msgs::Bool b;
             b.data = true;
