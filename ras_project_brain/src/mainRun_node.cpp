@@ -14,17 +14,19 @@
 #include <math.h>
 #include <ras_project_brain/PickUpObj.h>
 
-#define INITIAL_STATE 0
-#define OBJECT_POSITION_SEND 1
-#define MOVE_TO_POSITION 2
-#define OBJ_DETECTION_STATE 3
-#define OBJ_PICKUP_STATE 4
-#define START_EXIT_PREPARATION 5
-#define GO_TO_OBJECT 6
-#define PICKUP_OBJECT 7
-#define GOTO_GOAL 8
-#define GOAL_REACHED 9
-#define DONE 10
+#define PRE_INITIAL_STATE 0
+#define PRE_INITIAL_PREP_STATE 1
+#define INITIAL_STATE 2
+#define OBJECT_POSITION_SEND 3
+#define MOVE_TO_POSITION 4
+#define OBJ_DETECTION_STATE 5
+#define OBJ_PICKUP_STATE 6
+#define START_EXIT_PREPARATION 7
+#define GO_TO_OBJECT 8
+#define PICKUP_OBJECT 9
+#define GOTO_GOAL 10
+#define GOAL_REACHED 11
+#define DONE 12
 
 struct object_details
 {
@@ -42,6 +44,7 @@ public:
     ros::Publisher objectCoordinateCalc_publisher;
     ros::Publisher robot_destination_publisher;
     ros::Publisher arm_engageSuction_publisher;
+    ros::Publisher object_listLoad_publisher;
 
     ros::Publisher uarm_pickup_publisher;
     ros::Subscriber uarm_pickup_ack_subscriber;
@@ -65,12 +68,12 @@ public:
         object_detected_current = object_detected_prev = 0;
         objectDistanceGoal_old = 200.0;
         start_coordCalc = 0;
-        index = no = 0;
+        index = no = count = 0;
         startup_flag = 0;
         slowMotor_toUpdate = goto_goal_flag = 0;
         pickup_complete = 0;
         uarm_smTrigger = 0;
-        current_state = INITIAL_STATE;
+        current_state = PRE_INITIAL_STATE;
         current_state_exit = GOTO_GOAL;
         objectDetection_publisher = n.advertise<std_msgs::String>("/espeak/string", 2);
         motorStop_publisher = n.advertise<std_msgs::Bool>("/pathFollow/slowDown", 1);
@@ -78,6 +81,7 @@ public:
         objectCoordinateCalc_publisher = n.advertise<std_msgs::Bool>("/tf/start_calc", 2);
         robot_destination_publisher = n.advertise<geometry_msgs::PoseStamped>("/robot/goal", 1);
         arm_engageSuction_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
+        object_listLoad_publisher = n.advertise<std_msgs::Bool>("/uarm/engageSuction",1);
 
         uarm_pickup_publisher = n.advertise<std_msgs::Bool>("/brain/smStart", 1);
         uarm_pickup_ack_subscriber = n.subscribe("/brain/smEnd", 3, &FirstRunNode::uarmSMCompleteAckCallback, this);
@@ -85,7 +89,7 @@ public:
         objectClass_subscriber = n.subscribe("/camera/object_class", 1, &FirstRunNode::objectClassCallback, this);
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &FirstRunNode::objectDetectionCallback, this);
         explorationCompletion_subscriber = n.subscribe("/Explored/done", 1, &FirstRunNode::explorationCompletionCallback, this);
-        objectPosition_subscriber = n.subscribe("/object/coordinates", 6, &FirstRunNode::objectPositionCallback, this);
+        objectPosition_subscriber = n.subscribe("/object/coordinates", 20, &FirstRunNode::objectPositionCallback, this);
         robot_map_position_subscriber = n.subscribe("/robot/pose", 1, &FirstRunNode::robotMapPositionCallback, this);
         object_number_update = n.subscribe("/object/numberLoad", 1, &FirstRunNode::objNumUpdateCallback, this);
         client = n.serviceClient<ras_project_brain::PickUpObj>("obj_pickup_sm");
@@ -144,33 +148,50 @@ public:
         slowMotor_toUpdate = 1;
         msg_motorSlowDown_bool.data = slowMotor_toUpdate;
         motorStop_publisher.publish(msg_motorSlowDown_bool);
-        if(0 == startup_flag)
-        {
-            startup_flag = 1;
-            int flag = 1;
-            int temp;
-            /*Calculate the positions in descending order*/
-            for(int i = 1; (i <= item_num) && flag; i++)
-            {
-                flag = 0;
-                for (int j=0; j < (item_num -1); j++)
-                {
-                    if (list[j+1].location.x > list[j].location.x)
-                    {
-                        temp = list[j].location.x;
-                        list[j].location.x = list[j+1].location.x;
-                        list[j+1].location.x = temp;
-                        flag = 1;
-                    }
-                }
-            }
-        }
-        if (ros::Time::now() - begin <= ros::Duration(30.0) && 0 == goto_goal_flag
+
+        if (ros::Time::now() - begin <= ros::Duration(180.0) && 0 == goto_goal_flag
                 && pickup_complete != 1)
         {
+            int flag = 1;
+            int temp;
             ROS_INFO("In state ready to pick objects");
             switch (current_state)
             {
+            case PRE_INITIAL_STATE:
+                current_state = PRE_INITIAL_PREP_STATE;
+                obj_startupLoad_bool.data = 1;
+                object_listLoad_publisher.publish(obj_startupLoad_bool);
+                break;
+            case PRE_INITIAL_PREP_STATE:
+                current_state = INITIAL_STATE;
+                obj_startupLoad_bool.data = 0;
+                object_listLoad_publisher.publish(obj_startupLoad_bool);
+
+                if(count != item_num)
+                {
+                    count++;
+                    current_state = PRE_INITIAL_PREP_STATE;
+                }
+                else
+                {
+                    /*Calculate the positions in descending order*/
+                    for(int i = 1; (i <= item_num) && flag; i++)
+                    {
+                        flag = 0;
+                        for (int j=0; j < (item_num -1); j++)
+                        {
+                            if (list[j+1].location.x > list[j].location.x)
+                            {
+                             temp = list[j].location.x;
+                             list[j].location.x = list[j+1].location.x;
+                             list[j+1].location.x = temp;
+                             flag = 1;
+                            }
+                        }
+                    }
+                }
+
+                break;
             case INITIAL_STATE:
                 current_state = OBJECT_POSITION_SEND;
                 /*Send the goal position to robot
@@ -266,8 +287,8 @@ public:
                 	current_state_exit = GOAL_REACHED;
                     msg_robotDestination.header.frame_id = "map";
                     msg_robotDestination.header.stamp = ros::Time::now();
-                    msg_robotDestination.pose.position.x = 0.0;
-                    msg_robotDestination.pose.position.y = 0.0;
+                    msg_robotDestination.pose.position.x = 0.22;
+                    msg_robotDestination.pose.position.y = 0.22;
                     msg_robotDestination.pose.position.z = 0.0;
                     robot_destination_publisher.publish(msg_robotDestination);
                 break;
@@ -311,12 +332,12 @@ private:
     std_msgs::String msg_eSpeak_string;
     geometry_msgs::PoseStamped msg_robotDestination;
     geometry_msgs::Point robotPosition;
-    std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool;
+    std_msgs::Bool msg_tfObjCalc_bool,msg_exploration_startStop_bool,obj_startupLoad_bool;
     std_msgs::Bool msg_motorSlowDown_bool, msg_uarm_pickup_bool, msg_uarm_engageSuction_bool;
     std_msgs::Float32 msg_odomDiffDist_float;
     ros::Time begin;
     object_details list[40];
-    int index, no;
+    int index, no, count;
     ras_project_brain::PickUpObj srv;
 };
 

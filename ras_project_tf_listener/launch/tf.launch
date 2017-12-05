@@ -1,4 +1,6 @@
 <launch>
 	<node name="object_position_transform" pkg="ras_project_tf_listener" type="object_tf_node" output="screen"/>
 	<node name="tf_listener" pkg="ras_project_tf_listener" type="tf_listener_node" output="screen"/>
+	<node name="central_node" pkg="ras_project_brain" type="uarm_state_node" output="screen"/>
+	<node name="espeak" pkg="ras_espeak" type="espeak_node" output="screen"/>
 </launch>

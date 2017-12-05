@@ -6,7 +6,9 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Vector3.h>
 #include <tf/transform_listener.h>
+#include <ras_msgs/RAS_Evidence.h>
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -26,7 +28,7 @@
 
 struct object_details
 {
-    geometry_msgs::Point location;
+    geometry_msgs::Vector3 location;
 };
 
 class FirstRunNode
@@ -90,7 +92,7 @@ public:
 
         objectClass_subscriber = n.subscribe("/camera/object_class", 1, &FirstRunNode::objectClassCallback, this);
         objectDetection_subscriber = n.subscribe("/camera/object_detected", 1, &FirstRunNode::objectDetectionCallback, this);
-        objectPosition_subscriber = n.subscribe("/map/objectCoord", 1, &FirstRunNode::objectPositionCallback, this);
+        objectPosition_subscriber = n.subscribe("/evidence", 1, &FirstRunNode::objectPositionCallback, this);
         explorationCompletion_subscriber = n.subscribe("/Explored/done", 1, &FirstRunNode::explorationCompletionCallback, this);
         robot_map_position_subscriber = n.subscribe("/robot/pose", 1, &FirstRunNode::robotMapPositionCallback, this);
         robot_map_update_subscriber = n.subscribe("/map/coordUpdate", 1, &FirstRunNode::mapCoordUpdateCallback, this);
@@ -113,9 +115,9 @@ public:
         classString.assign(msg->data);
     }
 
-    void objectPositionCallback(const geometry_msgs::PointStamped::ConstPtr &msg)
+    void objectPositionCallback(const ras_msgs::RAS_Evidence::ConstPtr &msg)
     {
-        list[i].location = msg->point;
+        list[i].location = msg->object_location.transform.translation;
     }
 
     void explorationCompletionCallback(const std_msgs::Bool::ConstPtr &msg)
@@ -150,7 +152,7 @@ public:
         msg_motorSlowDown_bool.data = slowMotor_toUpdate;
         motorStop_publisher.publish(msg_motorSlowDown_bool);
 
-        if (ros::Time::now()- begin <= ros::Duration(30.0) && exploration_completion!=1 )
+        if (ros::Time::now()- begin <= ros::Duration(3*60.0) && exploration_completion!=1 )
         {
             ROS_INFO("In state exploration");
             //continue exploration
@@ -296,8 +298,8 @@ public:
                 	current_state_exit = GOAL_REACHED;
                     msg_robotDestination.header.frame_id = "map";
                     msg_robotDestination.header.stamp = ros::Time::now();
-                    msg_robotDestination.pose.position.x = 0.0;
-                    msg_robotDestination.pose.position.y = 0.0;
+                    msg_robotDestination.pose.position.x = 0.22;
+                    msg_robotDestination.pose.position.y = 0.22;
                     msg_robotDestination.pose.position.z = 0.0;
                     robot_destination_publisher.publish(msg_robotDestination);
                     /*reset the map update*/
