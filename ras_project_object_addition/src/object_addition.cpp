@@ -6,9 +6,15 @@
 #include <geometry_msgs/TransformStamped.h>
 #include <ras_msgs/RAS_Evidence.h>
 #include <ras_project_camera/StringStamped.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/Int32.h>
+#include <ras_project_brain/ObjPickup_Update.h>
+#include <geometry_msgs/Point.h>
 #include <tf/transform_datatypes.h>
 #include <math.h>
 #include <std_msgs/Bool.h>
+#include <iostream>
+#include <fstream>
 class ObjectAddition
 {
 	private:
@@ -18,8 +24,17 @@ class ObjectAddition
 		ros::Subscriber battery_position_sub;
 		ros::Subscriber classification_sub;
 		ros::Subscriber image_sub;
+		ros::Subscriber pickup_sub;
+		ros::Subscriber save_sub;
+		ros::Subscriber load_sub;
+		ros::Publisher load_number_pub;
+		ros::Publisher load_coordinates_pub;
+		ros::Publisher coord_update_pub;
+		ros::Publisher saved_pub;
 		ros::Publisher evidence_pub;
 		ros::Publisher occupgrid_pub;
+		float exit_x_area;
+		float exit_y_area;
 		std::list<ras_msgs::RAS_Evidence> waiting_objects;
 		std::list< std::vector<float> > classified_objects;
 		std::string filename;
@@ -33,9 +48,24 @@ class ObjectAddition
 		battery_position_sub = n.subscribe("/map/batteryCoord", 10, &ObjectAddition::batteryPositionCallback, this);
     		classification_sub = n.subscribe("/camera/object_class", 10, &ObjectAddition::classificationCallback, this);
 		image_sub = n.subscribe("/camera/object_detected_image", 10, &ObjectAddition::imageCallback, this);
+		pickup_sub = n.subscribe("/map/pickupSuccess", 10, &ObjectAddition::pickupCallback, this);
+		save_sub = n.subscribe("/object/listSave", 10, &ObjectAddition::saveCallback, this);
+		load_sub = n.subscribe("/object/listLoad", 10, &ObjectAddition::loadCallback, this);
+		load_number_pub = n.advertise<std_msgs::Int32>("/object/numberLoad", 1);
+		load_coordinates_pub = n.advertise<geometry_msgs::Point>("/object/coordinates", 1);
+		coord_update_pub = n.advertise<std_msgs::Bool>("/map/coordUpdate", 1);
+		saved_pub = n.advertise<std_msgs::Bool>("/object/listSaved", 1);
 		evidence_pub = n.advertise<ras_msgs::RAS_Evidence>("/evidence", 1);
 		occupgrid_pub = n.advertise<geometry_msgs::PoseStamped>("/object_add", 1);
-		filename = "classified_objects.txt";
+		filename = "/home/ras11/catkin_ws/src/ras_project/ras_project_object_addition/classified_objects.txt";
+		std::vector<float> a(4);
+		a[0] = 0.3;
+		a[1] = 1.0;
+		a[2] = 0.6;
+		a[3] = 0.4;
+		classified_objects.push_back(a);
+		exit_x_area = 0.3;
+		exit_y_area = 0.3;
 	}
 		void objectPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg);
 		void trapPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg);
@@ -45,9 +75,96 @@ class ObjectAddition
 		void object_add(void);
 		int classification_string_to_int(std::string classification);
 		float classification_to_radius(int classification);
+		void pickupCallback(const ras_project_brain::ObjPickup_Update::ConstPtr& msg);
+		void saveCallback(const std_msgs::Bool::ConstPtr& msg);
+		void loadCallback(const std_msgs::Bool::ConstPtr& msg);
 };
 
+void ObjectAddition::pickupCallback(const ras_project_brain::ObjPickup_Update::ConstPtr& msg)
+{
+	for(it = classified_objects; it != classified_objects.end(); it++)
+	{
+		if ((*it)[0] == msg->coord.point.x && (*it)[1] == msg->coord.point.y && (*it)[2] = msg->coord.point.z && msg->pickedUp)
+		{
+			geometry_msgs::PoseStamped pose;
+			pose.header.stamp = ros::Time::now();
+			pose.pose.position.x = (*it)[0];
+			pose.pose.position.y = (*it)[1];
+			pose.pose.position.z = -1.0;
+			occupgrid_pub.publish(pose);
+			classified_objects.erase(it);
+			break;
+		}
+	}
+	return;
+}
+
+void ObjectAddition::saveCallback(const std_msgs::Bool::ConstPtr& msg)
+{
+	std::ofstream file;
+	file.open(filename.c_str());
+	if (file)
+	{
+		std::list< std::vector<float> >::iterator it;
+		for (it = classified_objects.begin(); it != classified_objects.end(); it++)
+		{
+			if ((*it)[3] < 17.0)
+			{
+				file.seekp(0,std::ios::end);
+				file<<(*it)[0]<<" "<<(*it)[1]<<" "<<(*it)[2]<<" "<<(*it)[3]<<"\n";
+			}
+		}
+		file.close();
+		std_msgs::Bool msg;
+		msg.data = true;
+		saved_pub.publish(msg);
+	}
+	else
+	{
+		std_msgs::Bool msg;
+		msg.data = false;
+		saved_pub.publish(msg);
+	}
+	return;
+}
+
+void ObjectAddition::loadCallback(const std_msgs::Bool::ConstPtr& msg)
+{
+	std::ifstream file;
+	file.open(filename.c_str());
+	if (file)
+	{
+		std::vector<float> object(4);
+		std::string line;
+		while(getline(file, line))
+		{
+			std::stringstream linestream(line);
+			linestream >> object[0] >> object[1] >> object[2] >> object[3];
+			classified_objects.push_back(object);
+		}
+	}
+	std_msgs::Int32 nmbr_objects;
+	nmbr_objects.data = classified_objects.size();
+	load_number_pub.publish(nmbr_objects);
+	std_msgs::Bool update;
+	update.data = true;
+	coord_update_pub.publish(update);
+	std::list< std::vector<float> >::iterator it;
+	for (it = classified_objects.begin(); it != classified_objects.end(); it++)
+	{
+		geometry_msgs::Point obj;
+		obj.x = (*it)[0];
+		obj.y = (*it)[1];
+		obj.z = (*it)[2];
+		load_coordinates_pub.publish(obj);
+	}
+	update.data = false;
+	coord_update_pub.publish(update);
+	return;
+}
+
 void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStamped::ConstPtr& msg) {
+	//ROS_INFO("Position");
 	ros::Time timestamp = msg->header.stamp;
 	std::list<ras_msgs::RAS_Evidence>::iterator it;
 	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
@@ -55,8 +172,15 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 		if (timestamp == it->stamp)
 			break;
 	}
-	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
+	if (msg->transform.translation.x <= exit_x_area && msg->transform.translation.y <= exit_y_area)
 	{
+		if (it != waiting_objects.end())
+			waiting_objects.erase(it);
+		return;
+	}
+	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)
+	{
+
 		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]) && std::abs(msg->transform.translation.z - (*it_bis)[2]) < 0.02)
 		{
 			if (it != waiting_objects.end())
@@ -67,7 +191,13 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 			return;
 		}
 	}
-	if (it == waiting_objects.end())
+	if (waiting_objects.front().object_location.header.stamp.toSec() != 0.0 && std::sqrt(std::pow(msg->transform.translation.x - waiting_objects.front().object_location.transform.translation.x,2) + std::pow(msg->transform.translation.y - waiting_objects.front().object_location.transform.translation.y,2)) < classification_to_radius(classification_string_to_int(waiting_objects.front().object_id) && std::abs(msg->transform.translation.z - waiting_objects.front().object_location.transform.translation.z) < 0.02))
+	{
+		if (it != waiting_objects.end())
+			waiting_objects.erase(it);
+		return;
+	}
+	else if (it == waiting_objects.end())
 	{
 		ras_msgs::RAS_Evidence object;
 		object.stamp = timestamp;
@@ -77,14 +207,15 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 	}
 	else
 	{
-		while (timestamp != waiting_objects.front().stamp)
-		{
-			//delete(&waiting_objects.front()); // Not sure if necessary, may cause error
-			waiting_objects.erase(waiting_objects.begin());
-		}
-		waiting_objects.front().object_location = *msg;
+		(*it).object_location = *msg;
+		std_msgs::Bool update;
 		if (waiting_objects.front().image_evidence.header.stamp.toSec() != 0.0 && waiting_objects.front().object_id != "")
 		{
+			while (timestamp != waiting_objects.front().stamp)
+				waiting_objects.erase(waiting_objects.begin());
+			waiting_objects.front().stamp = ros::Time::now();
+			update.data = true;
+			coord_update_pub.publish(update);
 			evidence_pub.publish(waiting_objects.front());
 			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
@@ -101,6 +232,8 @@ void ObjectAddition::objectPositionCallback(const geometry_msgs::TransformStampe
 			object_map.pose.position.z = 1;
 			occupgrid_pub.publish(object_map);
 		}
+		update.data = false;
+		coord_update_pub.publish(update);
 	}
 	return;
 }
@@ -112,6 +245,12 @@ void ObjectAddition::trapPositionCallback(const geometry_msgs::TransformStamped:
 	{
 		if (timestamp == it->stamp)
 			break;
+	}
+	if (msg->transform.translation.x <= exit_x_area && msg->transform.translation.y <= exit_y_area)
+	{
+		if (it != waiting_objects.end())
+			waiting_objects.erase(it);
+		return;
 	}
 	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
 	{
@@ -153,6 +292,12 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 		if (timestamp == it->stamp)
 			break;
 	}
+	if (msg->transform.translation.x <= exit_x_area && msg->transform.translation.y <= exit_y_area)
+	{
+		if (it != waiting_objects.end())
+			waiting_objects.erase(it);
+		return;
+	}
 	for (std::list< std::vector<float> >::iterator it_bis = classified_objects.begin(); it_bis != classified_objects.end(); it_bis++)	
 	{
 		if (std::sqrt(std::pow(msg->transform.translation.x - (*it_bis)[0],2) + std::pow(msg->transform.translation.y - (*it_bis)[1], 2)) < classification_to_radius((*it_bis)[3]) && std::abs(msg->transform.translation.z - (*it_bis)[2]) < 0.02)
@@ -186,6 +331,7 @@ void ObjectAddition::batteryPositionCallback(const geometry_msgs::TransformStamp
 }
 
 void ObjectAddition::classificationCallback (const ras_project_camera::StringStamped::ConstPtr& msg) {
+	//ROS_INFO("Classification");
 	ros::Time timestamp = msg->header.stamp;
 	std::list<ras_msgs::RAS_Evidence>::iterator it;
 	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
@@ -203,14 +349,15 @@ void ObjectAddition::classificationCallback (const ras_project_camera::StringSta
 	}
 	else
 	{
-		while (timestamp != waiting_objects.front().stamp)
-		{
-			//delete(&waiting_objects.front()); // Not sure if necessary, may cause error
-			waiting_objects.erase(waiting_objects.begin());
-		}
-		waiting_objects.front().object_id = msg->data;
+		(*it).object_id = msg->data;
+		std_msgs::Bool update;
 		if (waiting_objects.front().image_evidence.header.stamp.toSec() != 0.0 && waiting_objects.front().object_location.header.stamp.toSec() != 0.0)
 		{
+			while (timestamp != waiting_objects.front().stamp)
+				waiting_objects.erase(waiting_objects.begin());
+			update.data = true;
+			coord_update_pub.publish(update);
+			waiting_objects.front().stamp = ros::Time::now();
 			evidence_pub.publish(waiting_objects.front());
 			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
@@ -227,11 +374,14 @@ void ObjectAddition::classificationCallback (const ras_project_camera::StringSta
 			object_map.pose.position.z = 1;
 			occupgrid_pub.publish(object_map);
 		}
+		update.data = false;
+		coord_update_pub.publish(update);
 	}
 	return;
 }
 
 void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
+	//ROS_INFO("Image");
 	ros::Time timestamp = msg->header.stamp;
 	std::list<ras_msgs::RAS_Evidence>::iterator it;
 	for (it = waiting_objects.begin(); it != waiting_objects.end(); it++)
@@ -249,14 +399,15 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 	}
 	else
 	{
-		while (timestamp != waiting_objects.front().stamp)
-		{
-			//delete(&waiting_objects.front()); // Not sure if necessary, may cause error
-			waiting_objects.erase(waiting_objects.begin());
-		}
-		waiting_objects.front().image_evidence = *msg;
+		(*it).image_evidence = *msg;
+		std_msgs::Bool update;
 		if (waiting_objects.front().object_id != "" && waiting_objects.front().object_location.header.stamp.toSec() != 0.0)
 		{
+			while (timestamp != waiting_objects.front().stamp)
+				waiting_objects.erase(waiting_objects.begin());
+			update.data = true;
+			coord_update_pub.publish(update);
+			waiting_objects.front().stamp = ros::Time::now();
 			evidence_pub.publish(waiting_objects.front());
 			std::vector<float> object(4);
 			object[0] = waiting_objects.front().object_location.transform.translation.x;
@@ -273,6 +424,8 @@ void ObjectAddition::imageCallback (const sensor_msgs::Image::ConstPtr& msg) {
 			object_map.pose.position.z = 1;
 			occupgrid_pub.publish(object_map);
 		}
+		update.data = false;
+		coord_update_pub.publish(update);
 	}
 	return;
 }

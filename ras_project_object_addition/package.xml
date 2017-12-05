@@ -22,7 +22,7 @@
   <build_depend>pcl_ros</build_depend>
   <build_depend>ras_msgs</build_depend>
   <build_depend>ras_project_camera</build_depend>
-  <!--build_depend>message_generation</build_depend-->
+  <build_depend>ras_project_brain</build_depend>
 
   <run_depend>roscpp</run_depend>
   <run_depend>rospy</run_depend>
@@ -38,7 +38,7 @@
   <run_depend>python-tensorflow-pip</run_depend>	
   <run_depend>ras_msgs</run_depend>
   <run_depend>ras_project_camera</run_depend>
-  <!--run_depend>message_runtime</run_depend-->
+  <run_depend>ras_project_brain</run_depend>
   <export>
     <!-- Other tools can request additional information be placed here -->
 
