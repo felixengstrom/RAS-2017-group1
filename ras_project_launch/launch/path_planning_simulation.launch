@@ -1,5 +1,4 @@
 <launch>
-
 	<arg name="map_file" default="lab_maze_2017.txt"/>
 	<include file="$(find ras_project_localisation)/launch/localisation_simulation.launch" />
 	<node pkg="ras_project_path_planning" type="OccupancyGrid_node" name="OccupancyGrid_node">
