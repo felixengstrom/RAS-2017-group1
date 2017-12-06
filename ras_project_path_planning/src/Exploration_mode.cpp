@@ -455,14 +455,15 @@ if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
 	double percentage_explored = calc_explored();
-	if((percentage_explored) >exploration_percentage)
+	if((percentage_explored) >exploration_percentage && !Done.data)
 	{
+        goal_pos.header.stamp = ros::Time::now();
+        goal_pos.pose.position.x = 0.2;
+        goal_pos.pose.position.y = 0.2;
+        goal_pos.pose.orientation.w = 1.55;
+		Dest_pub.publish(goal_pos);
 		Done.data = true;
 		ROS_INFO_STREAM("We have now explored the amount specified. Done message is now true");
-	}
-	else
-	{
-		Done.data = false;
 	}
 	if(GO && GO_once && Csp_received && Done.data == false) //Initial random search, when initialized, GO=false makes sure its only run once
 	{
