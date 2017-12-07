@@ -1,3 +1,4 @@
+#include "std_msgs/Bool.h"
 #include "sensor_msgs/LaserScan.h"
 #include "sensor_msgs/PointCloud.h"
 #include "geometry_msgs/Point.h"
@@ -30,6 +31,7 @@ class ParticleFilter
         std::vector<Line> map;
         ros::Subscriber laser_sub;
         ros::Subscriber initialpose_sub;
+        ros::Subscriber odomdiff_sub;
         ros::Publisher location_pub;
         tf::TransformBroadcaster br;
         double lidar_displ_x;
@@ -43,6 +45,7 @@ class ParticleFilter
     public:
       
         bool hasScan;
+        void reInitiateParticles( const std_msgs::Bool::ConstPtr &msg);
         ParticleFilter(geometry_msgs::PoseStamped initialPose,
             int _nParticles,
             int _nScans,
@@ -98,6 +101,7 @@ ParticleFilter::ParticleFilter(
     lastPose = initialPose;
     initiateParticles(nParticles);
     laser_sub = n.subscribe("scan", 1, &ParticleFilter::scanCallback, this);
+    odomdiff_sub = n.subscribe("robot/odomdiff", 1, &ParticleFilter::reInitiateParticles, this);
     initialpose_sub = n.subscribe("initialpose", 1, &ParticleFilter::initialposeCallback, this);
 }
 void ParticleFilter::initialposeCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg)
@@ -108,6 +112,10 @@ void ParticleFilter::initialposeCallback(const geometry_msgs::PoseWithCovariance
     initiateParticles(nParticles);
 }
 
+void ParticleFilter::reInitiateParticles( const std_msgs::Bool::ConstPtr &msg)
+{   
+    //initiateParticles(nParticles);
+}
 void ParticleFilter::initiateParticles( int nParticles)
 {
     
@@ -122,12 +130,12 @@ void ParticleFilter::initiateParticles( int nParticles)
     for ( int i = 0; i < nParticles; i++)
     {
         geometry_msgs::Point32 p;
-        p.x = initialPoint.x + (float)vel_noise(rng);
-        p.y = initialPoint.y + (float)vel_noise(rng);
+        p.x = initialPoint.x + (float)vel_noise(rng)*2;
+        p.y = initialPoint.y + (float)vel_noise(rng)*2;
         p.z = 0;
         ps[i] = p;
         std::vector<float> values(2);
-        values[0] = initialAng + ang_noise(rng);
+        values[0] = initialAng + ang_noise(rng)*2;
         values[1] = 1;
         ch[i].values = values;
     }
@@ -207,7 +215,6 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
     try{
         listener.waitForTransform("odom",latest_scan.header.stamp,"odom",t ,"map",ros::Duration(1));
         listener.lookupTransform("odom",latest_scan.header.stamp,"odom",t ,"map", transform);
-        //ROS_INFO("found scan for odometry movement t1 %f, t2 %f", latest_scan.header.stamp.toSec(), t.toSec());
     } catch(tf::TransformException &ex)
     {
         ROS_INFO("particle update failed");
@@ -215,16 +222,19 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
     }
     for ( int i = 0; i < nParticles; i++)
     {
-        double alpha = particles.channels[i].values[0] + atan2(transform.getOrigin().y(),transform.getOrigin().x());
+        double alpha = particles.channels[i].values[0] 
+                     + atan2(transform.getOrigin().y(),transform.getOrigin().x());
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
-        double omega_n = particles.channels[i].values[0]+ wt*(1 + ang_noise(rng)*ang_noise_f) + ang_noise(rng)*ang_noise_f;
+        double omega_n = particles.channels[i].values[0]
+                       + wt*(1 + ang_noise(rng)*ang_noise_f) + ang_noise(rng)*ang_noise_f;
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
-        //omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
-        particles.points[i].x += cos(alpha)*vt+  vt*(float)vel_noise(rng)*cos(alpha)*lin_noise_f*100;
-        particles.points[i].y += sin(alpha)*vt +  vt*(float)vel_noise(rng)*sin(alpha)*lin_noise_f*100;
+        particles.points[i].x += cos(alpha)*vt 
+                               + vt*(float)vel_noise(rng)*cos(alpha)*lin_noise_f*100;
+        particles.points[i].y += sin(alpha)*vt 
+                               + vt*(float)vel_noise(rng)*sin(alpha)*lin_noise_f*100;
     }
 }
 

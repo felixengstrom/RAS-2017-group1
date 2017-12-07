@@ -39,6 +39,7 @@ class classification(object):
         self.cv_image = self.bridge.imgmsg_to_cv2(img, "bgr8")
         self.object_detected = True
         self.lastReading = img.header.stamp
+        rospy.loginfo("in image_cb")
 
 def main(args):
 
@@ -53,13 +54,13 @@ def main(args):
     		model = load_model(model_dir)
     print('model loaded')
     size = (160, 160)
-    r = rospy.Rate(7)
+    r = rospy.Rate(10)
 
     while not rospy.is_shutdown():
 		if(cl.object_detected == True and cl.barcode_detected == False):
 			cl.object_detected = False
-                        cl.hasBarcode = False
-			t0 = time.time()
+			#cl.hasBarcode = False
+            #t0 = time.time()
 			# Input 
 			# convert form cv:Mat to PIL
 			pil_im = fromarray(cl.cv_image)
@@ -81,7 +82,7 @@ def main(args):
 			index, value = max(enumerate(pred), key=operator.itemgetter(1))
 			clas = classes[index]
 			#rospy.loginfo("index %i", index)
-			rospy.loginfo("value %d, object class %s: ", value*100, clas)
+			#rospy.loginfo("value %d, object class %s: ", value*100, clas)
 			# publish if prob higher 70%
 			if (value>0.7):
 				h = std_msgs.msg.Header()

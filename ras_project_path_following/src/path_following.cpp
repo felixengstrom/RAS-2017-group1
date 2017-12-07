@@ -37,17 +37,17 @@ class PathFollowing
 //		vGain = 0.5; //  1
 		D = 0.1;
 		normal_speed = 0.1;
-		speed = 0.08;
+		speed = 0.12;
 		stop = true;
 		first = false;
 		n = ros::NodeHandle();
 		teleopTime = ros::Time::now();
-        teleop_sub= n.subscribe("/pose_teleop", 10, &PathFollowing::teleopCallback,this);
-        odometry_sub = n.subscribe("/robot/pose", 10, &PathFollowing::odometryCallback,this);
-		stop_sub = n.subscribe("/robot/stop", 10, &PathFollowing::stopCallback,this);
-		slowdown_sub = n.subscribe("/pathFollow/slowDown", 10, &PathFollowing::slowdownCallback,this);
+        teleop_sub= n.subscribe("/pose_teleop", 1, &PathFollowing::teleopCallback,this);
+        odometry_sub = n.subscribe("/robot/pose", 1, &PathFollowing::odometryCallback,this);
+		stop_sub = n.subscribe("/robot/stop", 1, &PathFollowing::stopCallback,this);
+		slowdown_sub = n.subscribe("/pathFollow/slowDown", 1, &PathFollowing::slowdownCallback,this);
 		odomdiff_sub = n.subscribe("/robot/odomdiff", 1, &PathFollowing::odomdiffCallback,this);
-        motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 10);
+        motor_pub = n.advertise<geometry_msgs::Twist>("motor_teleop/twist", 1);
 	}
 		void teleopCallback(const geometry_msgs::PoseArray::ConstPtr& msg);
 		void odometryCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
@@ -64,7 +64,7 @@ void PathFollowing::slowdownCallback(const std_msgs::Bool::ConstPtr& msg) {
 }
 
 void PathFollowing::odomdiffCallback(const std_msgs::Bool::ConstPtr& msg) {
-    ros::Rate r(10);
+    ros::Rate r(20);
     for (int i = 0; i<3; i++)
     {
 	    geometry_msgs::Twist move;
@@ -73,7 +73,7 @@ void PathFollowing::odomdiffCallback(const std_msgs::Bool::ConstPtr& msg) {
 	    motor_pub.publish(move);
         r.sleep();
     }
-    for (int i = 0; i<5; i++)
+    for (int i = 0; i<10; i++)
     {
         r.sleep();
     }
@@ -213,7 +213,7 @@ void PathFollowing::odometryCallback (const geometry_msgs::PoseStamped::ConstPtr
    float ygv = -(goal_point[0] - x_current)*std::sin(theta_current) + (goal_point[1] - y_current)*std::cos(theta_current);
    // Now we should calculate the curvature of the circle we want to follow to the point
    float curvature = 2*xgv/std::pow(D,2);
-   ROS_INFO("YGV : %f",ygv);
+   //ROS_INFO("YGV : %f",ygv);
    if (ygv <= 0.01 && goal_point[0] == poses.poses[nb_poses-1].position.x && goal_point[1] == poses.poses[nb_poses-1].position.y)
    {
 	float angular_difference = theta_current + PI/2.0 - poses.poses[nb_poses-1].orientation.w;

@@ -303,7 +303,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     }
     
     int w_id = wall_id[firstMax];
-    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
+    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove && false)
     {
         ROS_INFO("trying to remove wall");
         removeWall(map[w_id]);
@@ -500,15 +500,15 @@ int main(int argc, char*argv[])
     ros::NodeHandle nh("~");
 
     float POImaxDist;
-    nh.param<float>("POImaxDist", POImaxDist, 0.8);
+    nh.param<float>("POImaxDist", POImaxDist, 0.5);
     float POIminError;
-    nh.param<float>("POIminError", POIminError, 0.2);
+    nh.param<float>("POIminError", POIminError, 0.20);
     int tolerance;
-    nh.param<int>("tolerance", tolerance, 5);
+    nh.param<int>("tolerance", tolerance, 3);
     int minPOI;
     nh.param<int>("minPOI", minPOI, 15);
     int minPOIremove;
-    nh.param<int>("minPOIremove", minPOIremove, 10);
+    nh.param<int>("minPOIremove", minPOIremove, 15);
 
     std::string map_file;
     nh.param<std::string>("map_file", map_file, "lab_maze_2017.txt");

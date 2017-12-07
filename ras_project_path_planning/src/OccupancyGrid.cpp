@@ -362,11 +362,11 @@ void OccupancyGrid::ObjectCallback(const  geometry_msgs::PoseStamped::ConstPtr& 
 			delete_object(msg->pose.position.x, msg->pose.position.y, radius);
 			break;
 		case 3 : //Add battery to map
-			radius = battery_x;
+			radius = battery_x/2;
 			add_object(msg->pose.position.x, msg->pose.position.y, radius);
 			break;
 		case -3 : //Delete Battery from map (should never arrive)
-			radius = battery_x;
+			radius = battery_x/2;
 			delete_object(msg->pose.position.x, msg->pose.position.y, radius);
 			break;
 		default : break;
