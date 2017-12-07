@@ -135,8 +135,8 @@ if(initialized==true) return true;
     	if(x1 != max_num && x1 > mw) mw = x1;
 	if(x2 != max_num && x2 > mw) mw = x2;
 	
-    	if(y1 != max_num && y1 > mw) mh = y1;
-	if(y2 != max_num && y2 > mw) mh = y2;
+    	if(y1 != max_num && y1 > mh) mh = y1;
+	if(y2 != max_num && y2 > mh) mh = y2;
     }
 	mw= mw + (double)_res;
 	mh= mh + (double) _res;
