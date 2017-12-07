@@ -68,7 +68,7 @@ class ParticleFilter
         // Calculate the weight for the particles based on the last lidar reading
         void update_particles_weight();
         // Resample the particles based on current weights 
-        void resample_particles(float noise);
+        void resample_particles(float lin_noise, float ang_noise);
 
         // Callback functions
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
@@ -148,7 +148,7 @@ void ParticleFilter::initiateParticles( int nParticles)
     particles.channels = ch;
 }
 
-void ParticleFilter::resample_particles(float noise)
+void ParticleFilter::resample_particles(float lin_noise, float ang_noise)
 {
     double wSum = 0;
 
@@ -184,10 +184,10 @@ void ParticleFilter::resample_particles(float noise)
         double uni = rand()*sum/RAND_MAX;  
         int ind = cumulative.upper_bound(uni)->second;
         newPs[i] = particles.points[ind];
-        newPs[i].x += vel_noise(rng)*noise;
-        newPs[i].y += vel_noise(rng)*noise;
+        newPs[i].x += vel_noise(rng)*lin_noise;
+        newPs[i].y += vel_noise(rng)*lin_noise;
         newCh[i] = particles.channels[ind];
-        newCh[i].values[0] += vel_noise(rng)*noise;
+        newCh[i].values[0] += vel_noise(rng)*ang_noise;
     }
 
     particles.points = newPs;
@@ -223,6 +223,7 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
     }
     for ( int i = 0; i < nParticles; i++)
     {
+        if (rand()%100==0) continue;
         double alpha = particles.channels[i].values[0] + atan2(transform.getOrigin().y(),transform.getOrigin().x());
         double vt = sqrt(pow(transform.getOrigin().x(), 2) + pow(transform.getOrigin().y(), 2));
         double wt = tf::getYaw(transform.getRotation());
@@ -267,7 +268,7 @@ void ParticleFilter::update_particles_weight()
     int nAngles = laser_values.size();
 
     std::vector<int> inds;
-    float var = 0.2;
+    float var = 0.04;
     double angle_increment = 2*PI/nAngles;
 
     //find values that are not infinate in the laser.
@@ -432,13 +433,24 @@ int main(int argc, char*argv[])
     pp.pose.orientation.z = sin(alpha/2);
     ROS_INFO("x_start %f, ystart %f, omega_start %f", x_start, y_start, omega_start);
     
-    ParticleFilter pf(pp, 1000,8, map, 0.1, 0.1);   
+    ParticleFilter pf(pp, 1000,32, map, 0.1, 0.1);   
 
     ros::Rate rate(100);
+    ros::Time t = ros::Time::now();
+    int count = 0;
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();
-            pf.resample_particles(0.1);
+            pf.resample_particles(0.1, 0.5);
+        }
+        if ((ros::Time::now() - t).toSec()>=1)
+        {
+
+            std::cout << count<< std::endl;
+            count =0;
+            t = ros::Time::now();
+
+
         }
         pf.update_lastPose();
         parts.publish(pf.particles);

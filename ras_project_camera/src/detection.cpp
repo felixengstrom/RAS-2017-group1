@@ -171,7 +171,7 @@ int main (int argc, char** argv)
     }
     // is the point cloud an object
     int object_size = cloud_filtered->width * cloud_filtered->height;
-    ROS_INFO("Object size: %d", object_size);
+    //ROS_INFO("Object size: %d", object_size);
     //ROS_INFO("Min object size: %d", ic.min_size);
     std_msgs::Bool object_detected;
 
@@ -186,7 +186,7 @@ int main (int argc, char** argv)
     if (object_size > ic.min_size && ic.hasBarcode)
     {
       Eigen::Vector4f centroid;
-      ROS_INFO("barcode cb: %d", ic.hasBarcode);
+     // ROS_INFO("barcode cb: %d", ic.hasBarcode);
       pcl::compute3DCentroid(*cloud_filtered,centroid);
       ic.hasBarcode = 0;
       trap_coord.point.x = centroid[2];

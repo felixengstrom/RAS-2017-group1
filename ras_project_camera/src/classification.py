@@ -29,6 +29,7 @@ class classification(object):
         self.sub_barcode = rospy.Subscriber('/barcode', String, self.barcode_cb, queue_size = 1)
         #self.sub_image = rospy.Subscriber('/camera/rgb/image_raw', Image, self.image_cb, queue_size = 1 )
         self.pub_object_class = rospy.Publisher('/camera/object_class', stringStamped, queue_size = 1)
+        self.pub_speaker = rospy.Publisher('/espeak/string', String, queue_size = 1)
         self.bridge = CvBridge()
         
         #rospy.loginfo("subscribed to /camera/image/image_raw")
@@ -53,8 +54,9 @@ def main(args):
     		model = load_model(model_dir)
     print('model loaded')
     size = (160, 160)
-    r = rospy.Rate(7)
-
+    r = rospy.Rate(10)
+    count = 0
+    prev_class = 'No Object'
     while not rospy.is_shutdown():
 		if(cl.object_detected == True and cl.barcode_detected == False):
 			cl.object_detected = False
@@ -83,10 +85,17 @@ def main(args):
 			#rospy.loginfo("index %i", index)
 			rospy.loginfo("value %d, object class %s: ", value*100, clas)
 			# publish if prob higher 70%
-			if (value>0.7):
-				h = std_msgs.msg.Header()
-				h.stamp = cl.lastReading
-				cl.pub_object_class.publish (header = h, data = clas)
+			if (value>0.7 and clas!='No Object'):
+				if (clas == prev_class):
+					count = count + 1
+				else: 
+					prev_class=clas
+					count = 0
+				if (count == 1):
+					h = std_msgs.msg.Header()
+					h.stamp = cl.lastReading
+					cl.pub_object_class.publish (header = h, data = clas)
+					cl.pub_speaker.publish(data = clas)
 				#cl.pub_object_class.publish (data = clas)
 				#cv2.imshow("Image window", cv_image)
 				#cv2.waitKey(3)

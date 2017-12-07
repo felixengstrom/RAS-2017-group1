@@ -213,7 +213,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         if (lidar_range < POImaxDist and to_close > POIminError ) {
             dists2[i] = lidar_range;
             pointsOfInterest[i] = 1;
-        }else if (map_range < POImaxDist and to_far < -POIminError ){
+        }else if (map_range < POImaxDist and to_far < -POIminError*2){
             dists2[i] = map_range;
             pointsOfInterest[i] = 2;
         }else{
@@ -303,7 +303,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     }
     
     int w_id = wall_id[firstMax];
-    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
+    if (false and typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
     {
         ROS_INFO("trying to remove wall");
         removeWall(map[w_id]);
@@ -508,7 +508,7 @@ int main(int argc, char*argv[])
     int minPOI;
     nh.param<int>("minPOI", minPOI, 15);
     int minPOIremove;
-    nh.param<int>("minPOIremove", minPOIremove, 10);
+    nh.param<int>("minPOIremove", minPOIremove, 15);
 
     std::string map_file;
     nh.param<std::string>("map_file", map_file, "lab_maze_2017.txt");
