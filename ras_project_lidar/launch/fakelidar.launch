@@ -4,6 +4,6 @@
 	 <param name="map_file" value="$(find ras_project_lidar)/map/$(arg map_file)"/>
   </node>
   <node pkg="ras_project_lidar" type="lidar_transform" name="lidar_transform" output="screen"/>
-  <node pkg="motor_controller" type="motor_mockup" name="motor_mockup" output="screen"/>
+  <node pkg="ras_project_motor_controller" type="motor_mockup" name="motor_mockup" output="screen"/>
   <node pkg="ras_project_odometry" type="odometry_node" name="odometry" output="screen"/>
 </launch>

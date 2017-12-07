@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(motor_controller)
+project(ras_project_motor_controller)
 add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS 
 	roscpp
@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 catkin_package(LIBRARIES 
-	motor_controller 
+	ras_project_motor_controller 
 	CATKIN_DEPENDS 
 	roscpp 
 	rospy
