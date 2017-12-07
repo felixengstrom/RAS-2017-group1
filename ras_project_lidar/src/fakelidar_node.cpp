@@ -1,3 +1,4 @@
+// Author: Felix Engström
 #include <ros/ros.h>
 #include "sensor_msgs/LaserScan.h"
 #include "sensor_msgs/PointCloud.h"
@@ -55,21 +56,6 @@ sensor_msgs::LaserScan FakeLidar::fakeScan()
     fakey.range_max = 6.0;
     std::vector<float> dists = rayTrace();
     fakey.ranges = dists;
-
-    /*
-      seq: 3176
-                 stamp: 
-                     secs: 1509613003
-                               nsecs: 156990843
-                                 frame_id: laser
-                                 angle_min: -3.12413907051
-                                 angle_max: 3.14159274101
-                                 angle_increment: 0.0174532923847
-                                 time_increment: 3.82735464655e-07
-                                 scan_time: 0.000137402035762
-                                 range_min: 0.15000000596
-                                 range_max: 6.0
-    */ 
     return fakey;
 
 }
