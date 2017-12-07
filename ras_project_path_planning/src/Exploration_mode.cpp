@@ -92,7 +92,7 @@ class Exploration
 			n.param<int>("resolution_cutting",resolution_cutting,10);
 			n.param<double>("foward_margin",forward_exp,0.2);
 			n.param<double>("sideway_margin",sideway_exp,0.2);
-			n.param<double>("exploration_percentage",exploration_percentage,0.5);
+			n.param<double>("exploration_percentage",exploration_percentage,0.9);
 			OG_sub = n.subscribe("/maze_OccupancyGrid",10,&Exploration::OGCallback,this);
 			Csp_sub = n.subscribe("/maze_CSpace",10,&Exploration::CspCallback,this);		
 			sw_sub = n.subscribe("/Exploration/Go",10,&Exploration::SwitchCallback,this);
