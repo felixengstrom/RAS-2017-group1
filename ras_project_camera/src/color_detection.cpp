@@ -27,6 +27,7 @@ public:
   ros::Subscriber detection_sub;
   ros::Publisher object_coord_pub;
   ros::Publisher object_flag_pub;
+  //ros::Publisher object_speaker_pub;
   cv::Mat hsv_frame;
   cv::Mat rgb_frame;
   cv_bridge::CvImagePtr cv_ptr;
@@ -49,8 +50,8 @@ public:
     image_pub_ = it_.advertise("/camera/object_detected_image", 1);
     //detection_sub = nh_.subscribe("/camera/detection", 1, &ImageConverter::DetectionCb, this);
     object_coord_pub = nh_.advertise<geometry_msgs::PointStamped>("/camera/object_coord",1);
-    object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/object_detected",1);
-
+    object_flag_pub = nh_.advertise<std_msgs::Bool>("/camera/color_detected",1);
+   // object_speaker_pub = nh_.advertise<std_msgs::String>("/espeak/string",1); 
     //cv::namedWindow(OPENCV_WINDOW);
 
     ros::NodeHandle nh("~");
@@ -113,8 +114,13 @@ public:
   
   void DetectionCb(const std_msgs::Bool::ConstPtr& msg)
   {
-    detected = msg->data;
+    detected = true;
     //std::cerr << "detected" << detected << std::endl;
+  }
+
+  void BarcodeCb(const std_msgs::String msg)
+  {
+    barcode_detected = true;
   }
 
   void ImageCb(const sensor_msgs::ImageConstPtr& msg)
@@ -227,22 +233,37 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       centers.insert( centers.end(), orange_center.begin(), orange_center.end() );
       
       std_msgs::Bool object_flag;
+      //std_msgs::String speaker_flag;
       geometry_msgs::PointStamped object_coord;
       object_coord.header.stamp = ic.lastReading;
-      
-      size_t counts = centers.size();
-      //std::cerr << "number of objects " << counts << std::endl;
-      //std::cerr << "x and y of centers" << centers << std::endl;
+      size_t counts = center.size();
+      //std::cerr << "number of objects" << counts << std::endl;
+
       if (counts!=0)
       { 
         int y_max = -1;
         int idx = -1;
         for (int j = 0; j<counts; ++j)
         {
-          if (y_max<centers[j].y)
-          {
-            y_max = centers[j].y;
-            idx = j;
+          cv::circle(thresholded_frame, center[i], radius[i], red, 3);
+        }
+        object_flag.data = 1;
+       // speaker_flag.data = "An object";
+        	if (ic.detected)// and !ic.barcode_detected)
+        	{
+          //Publish object coord
+          object_coord.point.x = center[0].x;
+          object_coord.point.y = center[0].y;
+          ic.object_coord_pub.publish(object_coord);
+
+          //Publish object detected image 
+          cv_bridge::CvImage out_msg;
+          out_msg.header.stamp = ic.lastReading;
+          out_msg.encoding = sensor_msgs::image_encodings::BGR8;
+          out_msg.image = ic.cv_ptr->image;
+          ic.image_pub_.publish(out_msg.toImageMsg());
+          ic.detected = 0;
+          ic.barcode_detected = 0;
           }
         }
 
@@ -275,6 +296,7 @@ int main(int argc, char* argv[]) //int main(int argc, char** argv)
       }
       
       ic.object_flag_pub.publish(object_flag);
+     // ic.object_speaker_pub.publish(speaker_flag);
 
       //cv::imshow(OPENCV_WINDOW, thresholded_frame);
       //cv::waitKey(3);  

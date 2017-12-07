@@ -213,7 +213,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         if (lidar_range < POImaxDist and to_close > POIminError ) {
             dists2[i] = lidar_range;
             pointsOfInterest[i] = 1;
-        }else if (map_range < POImaxDist and to_far < -POIminError ){
+        }else if (map_range < POImaxDist and to_far < -POIminError*2){
             dists2[i] = map_range;
             pointsOfInterest[i] = 2;
         }else{
@@ -303,7 +303,7 @@ void WallAdder::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     }
     
     int w_id = wall_id[firstMax];
-    if (typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove && false)
+    if (false and typeMax==2 and map[w_id].type == 1 and countMax>minPOIremove)
     {
         ROS_INFO("trying to remove wall");
         removeWall(map[w_id]);

@@ -182,7 +182,6 @@ int main (int argc, char** argv)
       trap_coord.header.stamp = ic.lastReading;
       trap_coord.header.frame_id = "camera";
       Eigen::Vector4f centroid;
-      //ROS_INFO("barcode cb: %d", ic.hasBarcode);
       pcl::compute3DCentroid(*cloud_filtered,centroid);
       ic.hasBarcode = 0;
       trap_coord.point.x = centroid[2];

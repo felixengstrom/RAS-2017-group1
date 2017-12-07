@@ -16,10 +16,10 @@
     <include file="$(find ras_project_camera)/launch/camera.launch" />
     <node pkg="ras_project_odometry" type="odometry_node" name="odometry_node"/>
     <node pkg="ras_project_lidar" type="lidar_transform" name="lidar_transform"/>
-	<node pkg="ras_project_path_planning" type="OccupancyGrid_node" name="OccupancyGrid_node" output="screen">
+	<node pkg="ras_project_path_planning" type="OccupancyGrid_node" name="OccupancyGrid_node" >
 		<param name="map_file" value="$(find ras_project_localisation)/map/$(arg map_file)" />
 	</node>
-	<node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node" output="screen">
+	<node pkg="ras_project_path_planning" type="ras_project_path_planning_node" name="ras_project_path_lanning_node" >
 		<param name="Wall_step" value="$(arg Wall_step)" />
 		<param name="Wall_cost" value="$(arg Wall_cost)" />
     </node>

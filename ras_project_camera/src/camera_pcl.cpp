@@ -102,8 +102,9 @@ int main (int argc, char** argv)
         geometry_msgs::PointStamped coord_from_camera;
 	
         coord_from_camera.header.stamp = ic.lastReading;
+        coord_from_camera.header.frame_id = "robot";
         coord_from_camera.point.x = p.z;
-        coord_from_camera.point.y = p.x;
+        coord_from_camera.point.y = -p.x;
         coord_from_camera.point.z = p.y;
         ic.pub_world_coord.publish (coord_from_camera);
       }

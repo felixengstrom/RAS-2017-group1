@@ -36,8 +36,8 @@ class PathFollowing
 //		v_max = 0.5; // 0.2
 //		vGain = 0.5; //  1
 		D = 0.1;
-		normal_speed = 0.1;
-		speed = 0.12;
+		normal_speed = 0.09;
+		speed = 0.09;
 		stop = true;
 		first = false;
 		n = ros::NodeHandle();
@@ -64,8 +64,13 @@ void PathFollowing::slowdownCallback(const std_msgs::Bool::ConstPtr& msg) {
 }
 
 void PathFollowing::odomdiffCallback(const std_msgs::Bool::ConstPtr& msg) {
+<<<<<<< HEAD
     ros::Rate r(20);
     for (int i = 0; i<3; i++)
+=======
+    ros::Rate r(10);
+    for (int i = 0; i<12; i++)
+>>>>>>> felix_branch
     {
 	    geometry_msgs::Twist move;
 	    move.linear.x = -0.1;
@@ -75,6 +80,10 @@ void PathFollowing::odomdiffCallback(const std_msgs::Bool::ConstPtr& msg) {
     }
     for (int i = 0; i<10; i++)
     {
+	    geometry_msgs::Twist move;
+	    move.linear.x = 0.0;
+	    move.angular.z = 0.0;
+	    motor_pub.publish(move);
         r.sleep();
     }
 }
