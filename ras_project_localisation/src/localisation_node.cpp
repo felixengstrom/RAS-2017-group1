@@ -270,7 +270,7 @@ void ParticleFilter::update_particles_weight()
     int nAngles = laser_values.size();
 
     std::vector<int> inds;
-    float var = 0.5;
+    float var = 0.2;
     double angle_increment = 2*PI/nAngles;
 
     //find values that are not infinate in the laser.
@@ -442,7 +442,7 @@ int main(int argc, char*argv[])
     while (ros::ok()){
         if (pf.hasScan){
             pf.update_particles_weight();
-            pf.resample_particles(0.05);
+            pf.resample_particles(0.1);
         }
         pf.update_lastPose();
         parts.publish(pf.particles);

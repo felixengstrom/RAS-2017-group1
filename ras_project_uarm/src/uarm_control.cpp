@@ -130,10 +130,20 @@ bool UarmController::moveToPointService(ras_project_uarm::MoveArmCartesian::Requ
                         ras_project_uarm::MoveArmCartesian::Response &res)
 {
     bool success = false;
-    float x = req.point.point.x;
-    float y = req.point.point.y;
-    float z = req.point.point.z;
-    z += 0.02;
+    geometry_msgs::PointStamped point_robot_frame;
+
+    try
+    {
+        tf_.transformPoint(arm_frame, req.point, point_robot_frame);
+    }
+    catch (tf::TransformException &ex) 
+    {
+        ROS_INFO("Could not get transformation to perform moveToPointCallback");
+    }
+
+    float x = point_robot_frame.point.x;
+    float y = point_robot_frame.point.y;
+    float z = point_robot_frame.point.z;
     ROS_INFO("x:%f, y:%f, z:%f", x, y, z);
     
 
