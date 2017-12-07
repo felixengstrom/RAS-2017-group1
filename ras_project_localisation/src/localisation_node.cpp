@@ -1,3 +1,4 @@
+//Author: Felix Engström
 #include "sensor_msgs/LaserScan.h"
 #include "sensor_msgs/PointCloud.h"
 #include "geometry_msgs/Point.h"
@@ -37,6 +38,7 @@ class ParticleFilter
         double lidar_displ_omega;
         float ang_noise_factor;
         float lin_noise_factor;
+        // Initiate particles around last position with gaussian noise
         void initiateParticles( int nParticles);
 
         
@@ -57,11 +59,18 @@ class ParticleFilter
         std::vector<float> rayTrace(const geometry_msgs::Point32 &pos,
             float angle,
             const std::vector<float> &angles);
+        // Update the position of the particles with the odometry from the time of the last
+        // update to time t. Add a noice to the updates, with magnitude governed by ang_noise and
+        // lin_noise.
         void update_particles_position(ros::Time t,
             float ang_noise_f,
             float lin_noise_f);
+        // Calculate the weight for the particles based on the last lidar reading
         void update_particles_weight();
+        // Resample the particles based on current weights 
         void resample_particles(float noise);
+
+        // Callback functions
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
         void initialposeCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg);
 };
@@ -100,6 +109,7 @@ ParticleFilter::ParticleFilter(
     laser_sub = n.subscribe("scan", 1, &ParticleFilter::scanCallback, this);
     initialpose_sub = n.subscribe("initialpose", 1, &ParticleFilter::initialposeCallback, this);
 }
+
 void ParticleFilter::initialposeCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg)
 {  
     ROS_INFO("inital_callback");
@@ -173,7 +183,6 @@ void ParticleFilter::resample_particles(float noise)
     {
         double uni = rand()*sum/RAND_MAX;  
         int ind = cumulative.upper_bound(uni)->second;
-        //std::cout << sum<< " "<< uni<< " " << ind << "\n";
         newPs[i] = particles.points[ind];
         newPs[i].x += vel_noise(rng)*noise;
         newPs[i].y += vel_noise(rng)*noise;
@@ -207,7 +216,6 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
     try{
         listener.waitForTransform("odom",latest_scan.header.stamp,"odom",t ,"map",ros::Duration(1));
         listener.lookupTransform("odom",latest_scan.header.stamp,"odom",t ,"map", transform);
-        //ROS_INFO("found scan for odometry movement t1 %f, t2 %f", latest_scan.header.stamp.toSec(), t.toSec());
     } catch(tf::TransformException &ex)
     {
         ROS_INFO("particle update failed");
@@ -222,7 +230,6 @@ void ParticleFilter::update_particles_position(ros::Time t, float ang_noise_f, f
 
         geometry_msgs::Point32 p = particles.points[i];
         particles.channels[i].values[0] = omega_n;
-        //omega_n = omega_n-(std::round(omega_n/(2*PI))*2*PI); //OPTIMATION COULD BE MADE BY REMOVING THIS
         particles.points[i].x += cos(alpha)*vt+  vt*(float)vel_noise(rng)*cos(alpha)*lin_noise_f*100;
         particles.points[i].y += sin(alpha)*vt +  vt*(float)vel_noise(rng)*sin(alpha)*lin_noise_f*100;
     }
@@ -267,7 +274,6 @@ void ParticleFilter::update_particles_weight()
     for(int ind = 0; ind<nAngles;ind++)
     {
         if (laser_values[ind]<3) //should really check if value not == inf, but who cares?                           
-            //  We should not have values larger than 10 either
 
         {
             inds.push_back(ind);
