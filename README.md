@@ -7,7 +7,7 @@ Sarangi Veeramani Lekamani
 
 #Building the project:
 catkin_make
-Build individual package:
+#Build individual package:
 catkin_make -DCATKIN_WHITELIST_PACKAGES="<package name>"
   
 #Launching the executables
