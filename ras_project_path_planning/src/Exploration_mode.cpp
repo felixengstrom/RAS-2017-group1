@@ -34,8 +34,6 @@ class Exploration
 		ros::Subscriber curr_sub;
 	        //Switch subscribe
 		ros::Subscriber sw_sub;	
-		//Path error subscribe
-		ros::Subscriber path_sub;
 		//--------------//	
 		//Constants//
 		static const double r = 0.29/2; //radius of robot
@@ -72,7 +70,7 @@ class Exploration
 		void OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 		void CspCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 		void CurrCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
-		void PathCallback(const std_msgs::Bool::ConstPtr& msg);
+
 		void SwitchCallback(const std_msgs::Bool::ConstPtr& msg)
 		{  GO_once = msg->data;  return; }
 		//Exploration Stratergy Function
@@ -97,7 +95,6 @@ class Exploration
 			n.param<double>("exploration_percentage",exploration_percentage,0.5);
 			OG_sub = n.subscribe("/maze_OccupancyGrid",10,&Exploration::OGCallback,this);
 			Csp_sub = n.subscribe("/maze_CSpace",10,&Exploration::CspCallback,this);		
-			path_sub = n.subscribe("/path/unreachable",0,&Exploration::PathCallback,this);
 			sw_sub = n.subscribe("/Exploration/Go",10,&Exploration::SwitchCallback,this);
 			curr_sub = n.subscribe("/robot/pose",10,&Exploration::CurrCallback,this);
 			Dest_pub = n.advertise<geometry_msgs::PoseStamped>("/robot/goal",0);	
@@ -109,14 +106,6 @@ class Exploration
 		void loop_function();
 
 };
-
-void Exploration::PathCallback(const std_msgs::Bool::ConstPtr& msg)
-{
-	if(msg->data ==false)
-	{
-		random_search();
-	}
-}
 void Exploration::Add_WallExplored()
 {
 int x_ratio = Csp.info.width/Exp.info.width;
@@ -466,14 +455,15 @@ if(Exp_initialized==true)
 {
 	eMap_pub.publish(Exp);
 	double percentage_explored = calc_explored();
-	if((percentage_explored) >exploration_percentage)
+	if((percentage_explored) >exploration_percentage && !Done.data)
 	{
+        goal_pos.header.stamp = ros::Time::now();
+        goal_pos.pose.position.x = 0.2;
+        goal_pos.pose.position.y = 0.2;
+        goal_pos.pose.orientation.w = 1.55;
+		Dest_pub.publish(goal_pos);
 		Done.data = true;
 		ROS_INFO_STREAM("We have now explored the amount specified. Done message is now true");
-	}
-	else
-	{
-		Done.data = false;
 	}
 	if(GO && GO_once && Csp_received && Done.data == false) //Initial random search, when initialized, GO=false makes sure its only run once
 	{

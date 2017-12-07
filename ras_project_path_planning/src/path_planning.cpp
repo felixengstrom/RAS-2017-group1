@@ -51,7 +51,6 @@ class PathPlanning
 		ros::Time goal_update; // for Goal Callback
 		ros::Time gNow;
 		ros::Time tNow;
-		ros::Time noPathNow;
 		//map variables
 		float _res;
 		int _width,_height;
@@ -66,7 +65,6 @@ class PathPlanning
 		std::map <int, int > cameFrom;
 		double x_start, y_start,x_goal,y_goal,w_goal;
 		ros::Time pathTime;
-		bool Path_success;
 		//Path Smoothing
 		std::vector<int> path_list;
 		double gradient;
@@ -77,7 +75,7 @@ class PathPlanning
 		int Wall_tolerance; //integer can not be bigger than Wall_step!
 		double WallT;
 	public:
-		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1),newtry(false), Path_success(true) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
+		PathPlanning(): initialized(false), listener(), x_start(-1),y_start(-1),newtry(false) //Wall_step(0), Wall_cost(0),Wall_tolerance(0)
 		{
 			WallT=Wall_cost*(double)Wall_tolerance; //used for pathsmoothing tolerance
 			n = ros::NodeHandle("~");
@@ -103,7 +101,7 @@ class PathPlanning
 		{x_start=msg->pose.position.x; y_start = msg-> pose.position.y; return; }
 		void GoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 		void OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg); // Creates C-space Csp
-		bool Path(double x0, double y0, double x1,double y1); // A* evaluates path
+		void Path(double x0, double y0, double x1,double y1); // A* evaluates path
 		void Reconstruct_path(int curr_index); //Reconstruct path from Path() WITH SMOOTHING
 		bool Checkline(int start, int goal); //used in Reconstruct_path, check if line between two points [start,goal] is empty
 		void loop_function();
@@ -212,16 +210,7 @@ if(gNow==goal_update && t_update == tNow && x_start>=0 && y_start>=0){
 		followerstop.data = true;
 		Follower_stop_pub.publish(followerstop);
 		//--------------------------------------//
-		if(Path_success)
-		{
-			noPathNow = gNow;
-			Path_success =	Path(x_start,y_start,x_goal,y_goal);
-		}
-		else //If path not found, or we get an error, we will not try another time until goal is updated again
-		{
-			if(noPathNow !=gNow)
-				Path_success = true;
-		}
+		Path(x_start,y_start,x_goal,y_goal);
 	}
 
 	if(path_list.size()>0){
@@ -361,7 +350,7 @@ void PathPlanning::OGCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 }
 
 
-bool PathPlanning::Path(double x0, double y0, double x1, double y1)
+void PathPlanning::Path(double x0, double y0, double x1, double y1)
 {
 
 //A*
@@ -411,10 +400,10 @@ while(loop)
 	}
 	step++;
 	if(step>100)
-	{ROS_INFO_STREAM("No open goal point found in  " << step << " steps around the original point");return false; }
+	{return; ROS_INFO_STREAM("No open goal point found in  " << step << " steps around the original point");}
 }
 }}
-else { ROS_INFO_STREAM(" given goal outside maze grid");return false;}
+else { ROS_INFO_STREAM(" given goal outside maze grid");return;}
 
 if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 {
@@ -459,14 +448,14 @@ if(x_Start + y_Start*_width < Csp.size() && x_Start + y_Start * _width >=0)
 
 		step++;
 		if(step>100)
-		{loop=false; ROS_INFO_STREAM("No outside wall point in " << step << " steps"); return false;}
+		{loop=false; ROS_INFO_STREAM("No outside wall point in " << step << " steps");}
 		}
 		ROS_INFO_STREAM("Current Position in wall, taken the " << step << " closest point instead" );
 
 	}
 
 }
-else{ROS_INFO_STREAM("Start Position outside maze grid"); return false;}
+else{ROS_INFO_STREAM("Start Position outside maze grid"); return;}
 //Reset values
 path_list.clear();
 cameFrom.clear();
@@ -503,7 +492,7 @@ while(openSet.size()!=0 && no_path)
 	point current= openSet[D];
 	int curr_index = current.x+current.y*_width;
 	if(current.x==goalpos.x && current.y==goalpos.y)
-	{Reconstruct_path(curr_index);return true;}
+	{Reconstruct_path(curr_index);return;}
 	
 	closeSet.insert(std::pair<int,point>(curr_index,current));
 	openSet.erase(D);
@@ -543,14 +532,14 @@ if(closeSet.size() <=closed_size)
 { 	ROS_INFO_STREAM("Given goal unreachable by pathplanning"); Wall_step = std::max(0,Wall_step-1);
 	std_msgs::Bool notreachable; notreachable.data = false;
 	Path_unreachable_pub.publish(notreachable);       	
-	return false;
+	return;
 }	
 closed_size=closeSet.size();
 }
 ROS_INFO_STREAM("Given goal is unreachable by pathplanning, publishing false to topic");
 std_msgs::Bool notreachable; notreachable.data = false;
 Path_unreachable_pub.publish(notreachable);       	
-return false;
+return;
 }
 
 
@@ -562,8 +551,11 @@ void PathPlanning::Reconstruct_path(int curr_index)
 	int parent;
 	child=curr_index;
 	parent=cameFrom[child];
+//	std::vector<int> reverse_path;
+//	reverse_path.push_back(child);
+//	reverse_path.push_back(parent);
 
-
+	
 	
 	int smooth; //smoothing from this point to iterative close
 	std::vector<int> reverse_smooth;
@@ -573,6 +565,9 @@ while(parent!=child)
 {
 	child = parent;
 	parent = cameFrom[child];
+//	reverse_path.push_back(parent);
+	//else if(Checkline(smooth,parent)){continue;}
+	//if(Checkline(smooth,parent)){continue;}
 	if(Gradientsmoothing(child,parent)){continue;}	
 	//reverse_smooth.push_back(child);
 	reverse_smooth.push_back(parent);
