@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 catkin_package(LIBRARIES 
-	motor_controller 
+	ras_project_motor_controller 
 	CATKIN_DEPENDS 
 	roscpp 
 	rospy
